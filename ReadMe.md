@@ -1,4 +1,4 @@
-![PyCalc - Lists and Plot](media\PyCalc-ListsandPlot.jpg?)
+![PyCalc](media/PyCalc-ListsAndPlot.jpg)
 
 ## Hello and welcome to PyCalc, the RPN ~~calculator~~ ~~IDE~~ progam that loves Python
 
