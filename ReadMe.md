@@ -1,6 +1,6 @@
 ![PyCalc](media/PyCalc-ListsAndPlot.jpg)
 
-## Hello and welcome to PyCalc, the RPN ~~calculator~~ ~~IDE~~ progam that loves Python
+## Hello and welcome to PyCalc, the RPN ~~calculator~~ ~~IDE~~ program that loves Python
 
 This project is an experiment to see what happens when you take a Python interpreter, and put an RPN calculator style
 UI wrapper around it. 
@@ -96,6 +96,32 @@ imported Python module's functions can be called directly from the stack to oper
 6) press: 'enter' -- this is the equivalent of calling np.tan(<array at X>) the calculator loads in all 
 functions from the NumPy library so you can call them directly from the stack by typing the function name and then 
 pressing enter.
+
+#### Saving and Restoring Sessions
+
+The calculator has the ability to save and restore sessions. By default the calculator will save it's state on exit
+and load the state on start. The state is saved in the directory where the calculator is run from as 
+"last_state_autosave.pycalc". The save and restore state includes the stack, history, variables and calculator settings.
+
+Saving 
+1) With some values on the stack and/or in variables press: 'ctrl+s' or navigate to the file menu and select 'save'
+2) Select a location and name for the session file and press 'save'
+
+Restoring 
+
+3) With the calculator open press: 'ctrl+o' or navigate to the file menu and select 'open'
+4) In the file dialog select the session file and press 'open'
+
+
+#### User Options
+
+You can set some options in the calculator by navigating to the 'options' menu. The options are:
+- 'Save State on Exit' -- Turn this off and the calculator will initialize on launch each time.
+- 'Edit float format string' -- This will open a dialog where you can set the format string for floating point numbers, see: https://fstring.help/cheat/
+- 'Edit int format string' -- This will open a dialog where you can set the format string for integers, see: https://fstring.help/cheat/
+- 'Edit plot format string' -- This will open a dialog where you can set the format string for plots, for valid strings, see Parameters: **fmt** here: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html
+
+
 
 
 
