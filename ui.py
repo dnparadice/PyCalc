@@ -243,6 +243,8 @@ class MainWindow:
         self._menu_bar.add_cascade(label='File', menu=self._file_menu)
         self._edit_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='Edit', menu=self._edit_menu)
+        self._view_menu = tk.Menu(self._menu_bar)
+        self._menu_bar.add_cascade(label='View', menu=self._view_menu)
         self._options_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='Options', menu=self._options_menu)
 
@@ -265,6 +267,11 @@ class MainWindow:
         # add a 'undo' option to the edit menu
         self._edit_menu.add_command(label='Undo (ctrl+z)', command=self.undo_last_action)
 
+        # VIEW MENU ........................
+
+        # add a 'show user functions' option to the view menu that opens a popup window
+        self._view_menu.add_command(label='Show user functions', command=self.popup_show_user_functions)
+
         # OPTIONS MENU ........................
 
         # add a check option to the menu for 'save state on exit'
@@ -278,6 +285,9 @@ class MainWindow:
 
         # add an option to "edit the plot options string" that calls the method edit_plot_options_string
         self._options_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
+
+        # add an option to open the add function popup window that calls the method popup_add_function
+        self._options_menu.add_command(label='Add function', command=self.popup_add_function)
 
         # MENU BINDINGS ........................
 
@@ -334,6 +344,69 @@ class MainWindow:
         self._update_message_display()
 
         """ ------------------------------------- END __init__() ------------------------------------------------- """
+
+    def popup_add_function(self, function_string=None, parent_object=None):
+        """ opens a popup window to add a function to the calculator """
+        # create a new window
+        if parent_object is None:
+            parent = self._root
+        else:
+            parent = parent_object
+        window = tk.Toplevel(parent)
+        window.title('Add Function')
+
+        # create a text entry field
+        entry = tk.Text(window, height=5, width=50)
+        if function_string is None:
+            entry.insert('1.0', 'def my_function(x):\n    return x**2')
+        else:
+            entry.insert('1.0', function_string)
+        entry.focus()
+        entry.pack()
+
+        def apply_function():
+            function_string = entry.get('1.0', 'end')
+            try:
+                self._c.add_user_function(function_string)
+            except Exception as ex:
+                message = f"Error adding function: {ex}"
+                self._update_message_display(message)
+            else:
+                window.destroy()
+
+        # create a button to save the changes
+        ttk.Button(window, text='OK', command=apply_function).pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+    def popup_show_user_functions(self):
+        """ opens a popup window to show the user defined functions """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('User Functions')
+
+        # create a text entry field
+        entry = tk.Text(window, height=42, width=50)
+        func_dict = self._c.return_user_functions_for_display()
+        for key, value in func_dict.items():
+            entry.insert('end', f"{key}\n{value}\n\n")
+        entry.pack()
+
+        def edit_function():
+            """" opens the currently selected function in the edit function popup """
+            selected = entry.tag_ranges('sel')
+            if selected:
+                start = selected[0]
+                end = selected[1]
+                function_string = entry.get(start, end)
+                self.popup_add_function(function_string=function_string, parent_object=window)
+
+        # create a button to save the changes
+        ttk.Button(window, text='Edit', command=edit_function).pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
 
     def _load_settings_on_launch(self):
         """ looks for the settings file 'last_state_autosave' in the local directory and loads it if the user has
