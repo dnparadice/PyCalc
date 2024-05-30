@@ -938,6 +938,22 @@ class Calculator:
         log(self._message)
         self._stack = []
 
+    def clear_user_functions(self, function_name=None):
+        """ removes the user functions from the namespace and the user functions set """
+        if function_name is None:
+            to_remove = copy(list(self._user_functions.keys()))
+        else:
+            to_remove = {function_name}
+        for func in to_remove:
+            try:
+                self._user_functions.pop(func)
+                self._exec_globals.pop(func, None)
+                del func
+            except Exception as ex:
+                self._message = f"Error: cant remove function: '{func}' with error: '{ex}'"
+                log(self._message)
+                raise Exception(self._message) # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     def load_locals(self, new_locals: dict, clear_first=False):
         """ loads a new locals dictionary into the calculator object
         @param new_locals: the new locals dictionary to load
@@ -1008,6 +1024,10 @@ class Calculator:
         """ returns a list all the buttons (functions, methods, operations, constants) known to the calculator """
         keys = list(self._button_functions.keys())
         return keys
+
+    def return_user_functions(self):
+        """ returns a set of all the user defined functions """
+        return self._user_functions
 
     def return_message(self):
         """ returns the message string """
