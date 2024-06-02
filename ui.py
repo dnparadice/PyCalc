@@ -22,6 +22,7 @@ class CalculatorUiSettings:
         self.float_format_string = '0.6f'
         self.integer_format_string = ','
         self.plot_options_string = '-o'
+        self.last_user_function_edit_name = None
 
         # window size and appearance
         self.stack_rows = 7
@@ -33,7 +34,6 @@ class CalculatorUiSettings:
         self.stack_index_width = 5
         self.stack_value_width = 200
         self.stack_type_width = 50
-
         self.message_width = 57
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
@@ -49,6 +49,7 @@ class CalculatorUiState:
         self.stack = []
         self.locals = dict()
         self.settings = CalculatorUiSettings()
+        self.functions = dict()
 
 
 class MainWindow:
@@ -243,6 +244,8 @@ class MainWindow:
         self._menu_bar.add_cascade(label='File', menu=self._file_menu)
         self._edit_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='Edit', menu=self._edit_menu)
+        self._view_menu = tk.Menu(self._menu_bar)
+        self._menu_bar.add_cascade(label='View', menu=self._view_menu)
         self._options_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='Options', menu=self._options_menu)
 
@@ -265,10 +268,18 @@ class MainWindow:
         # add a 'undo' option to the edit menu
         self._edit_menu.add_command(label='Undo (ctrl+z)', command=self.undo_last_action)
 
+        # VIEW MENU ........................
+
+        # add a 'show user functions' option to the view menu that opens a popup window
+        self._view_menu.add_command(label='Show user functions', command=self.popup_show_user_functions)
+
         # OPTIONS MENU ........................
 
         # add a check option to the menu for 'save state on exit'
         self._options_menu.add_checkbutton(label='Save state on exit', onvalue=True, offvalue=False)
+
+        # add a separator
+        self._options_menu.add_separator()
 
         # add an option to "edit the float format string" that calls the method edit_float_format_string
         self._options_menu.add_command(label='Edit float format string', command=self.popup_edit_float_format_string)
@@ -278,6 +289,18 @@ class MainWindow:
 
         # add an option to "edit the plot options string" that calls the method edit_plot_options_string
         self._options_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
+
+        # add a line separator
+        self._options_menu.add_separator()
+
+        # add an option to open the add function popup window that calls the method popup_add_function
+        self._options_menu.add_command(label='Add function', command=self.popup_add_function)
+
+        # add an option to 'remove user function' that calls the method remove_user_function
+        self._options_menu.add_command(label='Remove function', command=self.popup_remove_user_function)
+
+        # add an option to 'clear all user functions' that calls the method clear_all_user_functions
+        self._options_menu.add_command(label='Clear all functions', command=self.popup_confirm_clear_all_user_functions)
 
         # MENU BINDINGS ........................
 
@@ -334,6 +357,106 @@ class MainWindow:
         self._update_message_display()
 
         """ ------------------------------------- END __init__() ------------------------------------------------- """
+
+    def popup_confirm_clear_all_user_functions(self):
+        """ opens a popup window to confirm the user wants to clear all user functions """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Confirm Clear All Functions')
+
+        # create a label to ask the user if they are sure
+        label = ttk.Label(window, text='Are you sure you want to clear all user functions?')
+        label.pack()
+
+        def clear_all_user_functions():
+            self._c.clear_user_functions()
+            window.destroy()
+
+        # create a button to confirm the clear all user functions
+        ttk.Button(window, text='OK', command=clear_all_user_functions).pack()
+
+        # create a button to cancel the clear all user functions
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        
+    def popup_remove_user_function(self):
+        """ popup that has a list of user functions and a button to remove the selected function """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Remove User Function')
+
+        # create a list box to show the user functions
+        list_box = tk.Listbox(window, height=10, width=50)
+        for key in self._c.return_user_functions().keys():
+            list_box.insert('end', key)
+        list_box.pack()
+
+        def remove_user_function():
+            selected = list_box.curselection()
+            if len(selected) == 0:
+                return
+            key = list_box.get(selected)
+            self._c.clear_user_functions(key)
+            window.destroy()
+
+        # create a button to remove the selected function
+        ttk.Button(window, text='Remove', command=remove_user_function).pack()
+
+        # create a button to cancel the remove function
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+    def popup_add_function(self, function_string=None, parent_object=None):
+        """ opens a popup window to add a function to the calculator """
+        # create a new window
+        if parent_object is None:
+            parent = self._root
+        else:
+            parent = parent_object
+        window = tk.Toplevel(parent)
+        window.title('Add Function')
+
+        # create a text entry field
+        entry = tk.Text(window, height=5, width=50)
+        if function_string is None:
+            default_text = 'def sqr_x(x):\n    return x**2'
+            txt = self._c.return_user_functions().get(self._settings.last_user_function_edit_name, default_text)
+            entry.insert('1.0', txt)
+        else:
+            entry.insert('1.0', function_string)
+        entry.focus()
+        entry.pack()
+
+        def apply_function():
+            function_string = entry.get('1.0', 'end')
+            try:
+                self._c.add_user_function(function_string)
+            except Exception as ex:
+                message = f"Error adding function: {ex}"
+                self._update_message_display(message)
+            else:
+                self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
+                window.destroy()
+
+        # create a button to save the changes
+        ttk.Button(window, text='OK', command=apply_function).pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+    def popup_show_user_functions(self):
+        """ opens a popup window to show the user defined functions """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('User Functions')
+
+        # create a text entry field
+        entry = tk.Text(window, height=42, width=50)
+        func_dict = self._c.return_user_functions_for_display()
+        for key, value in func_dict.items():
+            entry.insert('end', f"Name: '{key}':\n{value}____________________________________________\n")
+        entry.pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
 
     def _load_settings_on_launch(self):
         """ looks for the settings file 'last_state_autosave' in the local directory and loads it if the user has
@@ -509,6 +632,7 @@ class MainWindow:
         calc_state.stack = self._c.return_stack_for_display()
         calc_state.locals = self._c.return_locals()
         calc_state.settings = copy(self._settings)
+        calc_state.functions = self._c.return_user_functions()
         pkl_dump = pickle.dumps(calc_state)
         file.write(pkl_dump)
         file.close()
@@ -540,11 +664,24 @@ class MainWindow:
                 self._c.user_entry(item)
             log(f"loaded stack: {calc_state.stack}")
         if calc_state.settings is not None:
-            self._settings = calc_state.settings
+            # need to handle new items were added to the settings class
+            incoming = calc_state.settings
+            latest = self._settings
+            dif = set(vars(incoming)) ^ set(vars(latest))
+            for key in dif:
+                setattr(incoming, key, getattr(latest, key))
+
+            self._settings = incoming
             self._apply_ui_settings(self._settings)
             log(f"loaded settings: {calc_state.settings}")
-        # note: you cant update the UI here because this method is called before all UI objects are created
+        try:
+            if calc_state.functions is not None:
+                for key, value in calc_state.functions.items():
+                    self._c.add_user_function(value)
+        except Exception as ex:
+            pass # older versions of the calc state class did not have functions
 
+        # note: you cant update the UI here because this method is called before all UI objects are created
 
     def menu_clear_all_variables(self):
         self._c.clear_all_variables()
@@ -673,9 +810,6 @@ class MainWindow:
     def launch_ui(self):
         """ launches the main window by calling the Tk mainloop method """
         self._root.mainloop()
-
-
-
 
 
 

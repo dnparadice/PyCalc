@@ -51,6 +51,7 @@ class Calculator:
         self._button_functions = dict() # a dict of all the pre-defined calculator 'button' functions, like sqrt, sin, .
         self._imported_libs = set() # a set of all imported libraries
         self._imported_functions = set() # a set of all imported functions
+        self._user_functions = dict() # a dict of all user defined functions like {'name': '<function def text>'}
         self._all_functions = set() # a set of all possible functions that can be called including buttons and imports
 
         # use the awesome math lib to grab some pre-defined math methods ....  mathods?
@@ -151,7 +152,7 @@ class Calculator:
                                 }
 
         self._button_functions = built_in_functions | one_args | two_args | iterable_args
-        self._all_functions = set(self._button_functions.keys())
+        self._all_functions = set(self._button_functions.keys()) | self._user_functions.keys()
 
         # add the math functions to the exec_globals so they can be used in eval and exec
         self._exec_globals.update(math.__dict__)
@@ -304,11 +305,17 @@ class Calculator:
         if len(self._stack) > 0:
             x = self._stack[0] # dont pop X, leave it on the stack for error and success
             try:
-                iter(x)
-                if plot_args is not None:
-                    plt.plot(x, plot_args)
+
+                # check if a plot type object is already loaded up, if so plot it
+                if isinstance(x, list):
+                    if isinstance(x[0], plt.Artist):
+                        pass # plt.show() is called below
                 else:
-                    plt.plot(x)
+                    iter(x)
+                    if plot_args is not None:
+                        plt.plot(x, plot_args)
+                    else:
+                        plt.plot(x)
             except Exception as ex:
                 self._message = f"Error: cant plot: '{x}' with error: '{ex}'"
                 log(self._message)
@@ -937,6 +944,22 @@ class Calculator:
         log(self._message)
         self._stack = []
 
+    def clear_user_functions(self, function_name=None):
+        """ removes the user functions from the namespace and the user functions set """
+        if function_name is None:
+            to_remove = copy(list(self._user_functions.keys()))
+        else:
+            to_remove = {function_name}
+        for func in to_remove:
+            try:
+                self._user_functions.pop(func)
+                self._exec_globals.pop(func, None)
+                del func
+            except Exception as ex:
+                self._message = f"Error: cant remove function: '{func}' with error: '{ex}'"
+                log(self._message)
+                raise Exception(self._message) # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     def load_locals(self, new_locals: dict, clear_first=False):
         """ loads a new locals dictionary into the calculator object
         @param new_locals: the new locals dictionary to load
@@ -999,10 +1022,18 @@ class Calculator:
             else:
                 return None
 
+    def return_user_functions_for_display(self):
+        """ returns a set of all the user defined functions """
+        return copy(self._user_functions)
+
     def return_buttons_for_display(self):
         """ returns a list all the buttons (functions, methods, operations, constants) known to the calculator """
         keys = list(self._button_functions.keys())
         return keys
+
+    def return_user_functions(self):
+        """ returns a set of all the user defined functions """
+        return self._user_functions
 
     def return_message(self):
         """ returns the message string """
@@ -1035,7 +1066,8 @@ class Calculator:
             else:
                 log(f'{len_stack-idx - 1}: {item}')
 
-    def _convert_to_best_numeric(self, x) -> any:
+    @staticmethod
+    def _convert_to_best_numeric(x) -> any:
         """ trys to convert to an int, if that fails, convert to float, if that fails raises a ValueError
         @param x: the value to convert to a number
         @return: the number or raises a ValueError """
@@ -1047,3 +1079,21 @@ class Calculator:
                 return val
         except Exception as ex:
             raise ValueError(f"Cannot convert '{x}' to number with error: '{ex}'")
+
+    def add_user_function(self, function_string: str):
+        """ adds a user defined function to the calculator object
+        @param function_string: the function string to add to the calculator object """
+        self._message = None
+        try:
+            exec(function_string, self._exec_globals)
+            # get the name of the function
+            function_name = function_string.split(' ')[1].split('(')[0]
+            self._user_functions.update({function_name: function_string})
+            self._all_functions.add(function_name)
+            self._message = f"Added user function: {function_string}"
+        except Exception as ex:
+            self._message = f"Error: adding user function: '{function_string}' with error: '{ex}'"
+            log(self._message)
+            raise Exception(self._message)
+
+
