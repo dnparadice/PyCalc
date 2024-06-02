@@ -814,6 +814,3 @@ class MainWindow:
 
 
 
-
-
-

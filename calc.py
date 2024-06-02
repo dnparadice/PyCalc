@@ -305,11 +305,17 @@ class Calculator:
         if len(self._stack) > 0:
             x = self._stack[0] # dont pop X, leave it on the stack for error and success
             try:
-                iter(x)
-                if plot_args is not None:
-                    plt.plot(x, plot_args)
+
+                # check if a plot type object is already loaded up, if so plot it
+                if isinstance(x, list):
+                    if isinstance(x[0], plt.Artist):
+                        pass # plt.show() is called below
                 else:
-                    plt.plot(x)
+                    iter(x)
+                    if plot_args is not None:
+                        plt.plot(x, plot_args)
+                    else:
+                        plt.plot(x)
             except Exception as ex:
                 self._message = f"Error: cant plot: '{x}' with error: '{ex}'"
                 log(self._message)
@@ -1089,3 +1095,5 @@ class Calculator:
             self._message = f"Error: adding user function: '{function_string}' with error: '{ex}'"
             log(self._message)
             raise Exception(self._message)
+
+
