@@ -59,6 +59,34 @@ class MainWindow:
         @param settings: CalculatorUiSettings, the settings for the calculator UI, passing a value besides None here
         overrides the 'load settings on launch' behavior and uses the passed settings """
 
+        # determine if the system is win, max, or linux because tkinter.ttk needs some help with consistent styling
+        # and text size between OS flavors
+        # get os name with the os module
+        # import os
+        # os_name = os.name
+        # if os_name == 'nt':
+        #     # windows
+        #     Style().configure("TButton", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TEntry", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TLabel", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("Treeview", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TFrame", padding=6, relief="flat", font=('Arial', 12))
+        # elif os_name == 'posix':
+        #     # mac or linux
+        #     Style().configure("TButton", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TEntry", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TLabel", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("Treeview", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TFrame", padding=6, relief="flat", font=('Arial', 12))
+        # else:
+        #     # unknown
+        #     Style().configure("TButton", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TEntry", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TLabel", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("Treeview", padding=6, relief="flat", font=('Arial', 12))
+        #     Style().configure("TFrame", padding=6, relief="flat", font=('Arial', 12))
+
+
         self._autosave_path = 'last_state_autosave.pycalc'
         self._c = Calculator()
         self._root = tk.Tk()
