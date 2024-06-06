@@ -765,9 +765,10 @@ class MainWindow:
             else:
                 desired_width = self._settings.stack_value_width
                 stack_entry_string = str(stack_entry)
+                # truncate the displayed stack entry string if it is too long to fit in the table
                 if len(stack_entry_string) > desired_width:
                     stack_entry_string = stack_entry_string[:desired_width] + '...'
-                    print(f"truncated stack entry: '{stack_entry_string}' length: {len(stack_entry_string)}")
+                    # print(f"truncated stack entry: '{stack_entry_string}' length: {len(stack_entry_string)}")
 
             # push the stack values to the table
             self._stack_table.insert('',

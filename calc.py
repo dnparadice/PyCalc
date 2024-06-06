@@ -1,10 +1,10 @@
 
 import numpy as np
-import math as math  # consistency collides with conciseness here and consistency wins
+import math as math
+import matplotlib.pyplot as plt
 from copy import copy
 import inspect
 import builtins
-import matplotlib.pyplot as plt
 
 try:
     from logger import Logger
@@ -162,6 +162,9 @@ class Calculator:
         # self._exec_globals.update(py_operators)
 
         # finally, load up numpy, and matplotlib because they are distributed with python and supercharge the calculator
+        self.user_entry('import math as math')
+        self.user_entry('enter')
+
         self.user_entry('import numpy as np')  # you can import any installed library into the calculator like this
         self.user_entry('enter')
 
@@ -305,28 +308,23 @@ class Calculator:
         if len(self._stack) > 0:
             x = self._stack[0] # dont pop X, leave it on the stack for error and success
             try:
-
-                # check if a plot type object is already loaded up, if so plot it
-                if isinstance(x, list):
-                    if isinstance(x[0], plt.Artist):
-                        pass # plt.show() is called below
+                iter(x)
+                if isinstance(x[0], plt.Artist):
+                    pass  # plt.show() is called below
                 else:
-                    iter(x)
                     if plot_args is not None:
                         plt.plot(x, plot_args)
                     else:
                         plt.plot(x)
             except Exception as ex:
-                self._message = f"Error: cant plot: '{x}' with error: '{ex}'"
+                pass # this is to catch the iter(x) error
+            try:  # just plot whatever is loaded
+                plt.grid()  # todo: add more built in plot options
+                plt.show()
+                self._message = f"Plot shown"
+            except Exception as ex:
+                self._message = f"Error: cant show plot with error: '{ex}'"
                 log(self._message)
-                return # ---------------------------------------------------------------------------------------------->
-        try:
-            plt.grid() # todo: add more built in plot options
-            plt.show()
-            self._message = f"Plot shown"
-        except Exception as ex:
-            self._message = f"Error: cant show plot with error: '{ex}'"
-            log(self._message)
 
     def user_entry(self, user_input: any):
         """ Parses the user input string and performs the appropriate action. This method is the primary interface
@@ -1044,8 +1042,8 @@ class Calculator:
         to the stack history list and pops the oldest stack if the list is longer than 100 (default) items """
         if len(self._stack_history) > self._stack_history_length:
             removed = self._stack_history.pop(0)
-            log(f"Stack history limit of {self._stack_history_length} achieved.")
-            log(f"Removed oldest stack from stack history: {removed}")
+            # log(f"Stack history limit of {self._stack_history_length} achieved.")
+            # log(f"Removed oldest stack from stack history: {removed}")
         self._stack_history.append(self._stack.copy())
 
     def _constant_press(self, constant):
