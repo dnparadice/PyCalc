@@ -1,3 +1,4 @@
+import inspect
 import tkinter as tk
 import tkinter.filedialog as filedialog
 from tkinter import ttk
@@ -186,14 +187,22 @@ class MainWindow:
         self._calc_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
         self._calc_buttons.pack()
 
-        calc_buttons = ['delete', 'clear', 'X<->Y', '1/X', 'enter', ]
+        calc_buttons = ['delete', 'clear', 'x<->y', '1/x', 'enter', ]
+        more_buttons = ['x^2', 'x^y', 'e^x', 'pi', 'euler']
 
-        # arrange the buttons on a grid in a standard calculator layout
+        # arrange the buttons on a grid with the calc buttons on the right and the more buttons on the left
+        for i, button in enumerate(more_buttons):
+            ttk.Button(self._calc_buttons,
+                       text=button,
+                       command=lambda btn=button: self.button_press(btn),
+                       width=5,
+                       ).grid(row=i, column=0)
         for i, button in enumerate(calc_buttons):
             ttk.Button(self._calc_buttons,
                        text=button,
                        command=lambda btn=button: self.button_press(btn),
-                       ).pack(fill='x')
+                       width=5,
+                       ).grid(row=i, column=1)
 
         # create a frame for operation buttons
         self._operation_buttons = tk.Frame(self._left_frame, background=self._background_color, padx=5, pady=5)
@@ -288,18 +297,21 @@ class MainWindow:
         # add a 'save state' option to the file menu
         self._file_menu.add_command(label='Save state', command=self.menu_save_state)
 
-        # add a 'clear all variables' option to the file menu
-        self._file_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
-
         # EDIT MENU ........................
 
         # add a 'undo' option to the edit menu
         self._edit_menu.add_command(label='Undo (ctrl+z)', command=self.undo_last_action)
 
+        # add a 'clear all variables' option to the file menu
+        self._file_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
+
         # VIEW MENU ........................
 
         # add a 'show user functions' option to the view menu that opens a popup window
         self._view_menu.add_command(label='Show user functions', command=self.popup_show_user_functions)
+
+        # add a 'show all functions' option to the view menu that opens a popup window
+        self._view_menu.add_command(label='Show all functions', command=self.popup_show_all_functions)
 
         # OPTIONS MENU ........................
 
@@ -370,6 +382,7 @@ class MainWindow:
 
         # add a binding for undo
         self._root.bind('<Control-z>', lambda event: self.undo_last_action())
+        self._root.bind('<Command-z>', lambda event: self.undo_last_action())
 
         # add a binding for save state
         self._root.bind('<Control-s>', lambda event: self.menu_save_state())
@@ -485,6 +498,44 @@ class MainWindow:
 
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+    def popup_show_all_functions(self):
+        """ opens a popup window to show the all functions available to the calculator """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('All Functions')
+
+
+
+        # create a text entry field
+        entry = tk.Text(window, height=50, width=75)
+        func_dict = self._c.return_all_functions()
+        for key, value in func_dict.items():
+            if '__' not in key:
+                try:
+                    sig = inspect.signature(value)
+                except Exception as ex:
+                    sig = '()'
+                entry.insert('end',
+                             f"{key}{sig}:"
+                                    f"\n{value.__doc__}"
+                                    f"\n__________________________________________________________________________\n")
+
+        # add scroll bars to the text field
+        scroll = tk.Scrollbar(window)
+        scroll.pack(side='right', fill='y')
+        entry.config(yscrollcommand=scroll.set)
+        scroll.config(command=entry.yview)
+        entry.pack()
+
+
+
+        # add a numeric filed at the bottom of the window that shows the number of functions
+        ttk.Label(window, text=f"Number of functions: {len(func_dict)}").pack()
+
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Close', command=window.destroy).pack()
 
     def _load_settings_on_launch(self):
         """ looks for the settings file 'last_state_autosave' in the local directory and loads it if the user has
@@ -793,9 +844,10 @@ class MainWindow:
             else:
                 desired_width = self._settings.stack_value_width
                 stack_entry_string = str(stack_entry)
+                # truncate the displayed stack entry string if it is too long to fit in the table
                 if len(stack_entry_string) > desired_width:
                     stack_entry_string = stack_entry_string[:desired_width] + '...'
-                    print(f"truncated stack entry: '{stack_entry_string}' length: {len(stack_entry_string)}")
+                    # print(f"truncated stack entry: '{stack_entry_string}' length: {len(stack_entry_string)}")
 
             # push the stack values to the table
             self._stack_table.insert('',
@@ -808,7 +860,7 @@ class MainWindow:
         can pass a message to this method to display a message directly in the UI context
 
         @param direct_message: str , a message to display in the message field, passing a message
-        will override getting the message from the calculator, this is usefull for displaying
+        will override getting the message from the calculator, this is useful for displaying
         UI context messages to the user
         """
         self._message_field.config(state='normal')
@@ -838,9 +890,6 @@ class MainWindow:
     def launch_ui(self):
         """ launches the main window by calling the Tk mainloop method """
         self._root.mainloop()
-
-
-
 
 
 
