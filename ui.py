@@ -2,11 +2,11 @@ import inspect
 import tkinter as tk
 import tkinter.filedialog as filedialog
 from tkinter import ttk
-from tkinter.ttk import Style
 from calc import Calculator
 from copy import copy
-from struct import pack
 import pickle
+import platform
+from enum import Enum
 
 try:
     from logger import Logger
@@ -53,6 +53,13 @@ class CalculatorUiState:
         self.functions = dict()
 
 
+class OsType(Enum):
+    WINDOWS = 1
+    MAC = 2
+    LINUX = 3
+    UNKNOWN = 4
+
+
 class MainWindow:
 
     def __init__(self, settings: CalculatorUiSettings = None):
@@ -63,29 +70,20 @@ class MainWindow:
         # determine if the system is win, max, or linux because tkinter.ttk needs some help with consistent styling
         # and text size between OS flavors
         # get os name with the os module
-        # import os
-        # os_name = os.name
-        # if os_name == 'nt':
-        #     # windows
-        #     Style().configure("TButton", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TEntry", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TLabel", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("Treeview", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TFrame", padding=6, relief="flat", font=('Arial', 12))
-        # elif os_name == 'posix':
-        #     # mac or linux
-        #     Style().configure("TButton", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TEntry", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TLabel", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("Treeview", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TFrame", padding=6, relief="flat", font=('Arial', 12))
-        # else:
-        #     # unknown
-        #     Style().configure("TButton", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TEntry", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TLabel", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("Treeview", padding=6, relief="flat", font=('Arial', 12))
-        #     Style().configure("TFrame", padding=6, relief="flat", font=('Arial', 12))
+        import os
+        os_name = platform.system() # returns  'Windows', 'Darwin', 'Linux' or 'Java' ??? (apparently for android)
+        if os_name == 'Windows':
+            self._os_type = OsType.WINDOWS
+
+        elif os_name == 'Darwin':
+            self._os_type = OsType.MAC
+
+        elif os_name == 'Linux':
+            self._os_type = OsType.LINUX
+
+        else:
+            self._os_type = OsType.UNKNOWN
+
 
 
         self._autosave_path = 'last_state_autosave.pycalc'
@@ -169,18 +167,29 @@ class MainWindow:
 
         """   -------------------------------------  BUTTONS ---------------------------------------  """
 
+        # ttk buttons ane not the same across OS, need to adjust the width of the buttons
+        if self._os_type == OsType.WINDOWS:
+            button_width_mod = 5
+        elif self._os_type == OsType.LINUX:
+            button_width_mod = 2
+        elif self._os_type == OsType.MAC:
+            button_width_mod = 0 # the original was written on a MAC so the mods are for Windows and Linux
+        else:
+            button_width_mod = 0
+
         # create a frame for the math buttons
         self._numeric_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
         self._numeric_buttons.pack()
 
         numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
 
+
         # arrange the buttons on a grid in a standard calculator layout
         for i, button in enumerate(numbers):
             ttk.Button(self._numeric_buttons,
                        text=button,
                        command=lambda btn=button: self.button_press(btn),
-                       width=2,
+                       width=2 + button_width_mod,
                        ).grid(row=i//3, column=i%3,)
 
         # create a frame for the calc buttons
@@ -195,13 +204,13 @@ class MainWindow:
             ttk.Button(self._calc_buttons,
                        text=button,
                        command=lambda btn=button: self.button_press(btn),
-                       width=5,
+                       width=5 + button_width_mod,
                        ).grid(row=i, column=0)
         for i, button in enumerate(calc_buttons):
             ttk.Button(self._calc_buttons,
                        text=button,
                        command=lambda btn=button: self.button_press(btn),
-                       width=5,
+                       width=5 + button_width_mod,
                        ).grid(row=i, column=1)
 
         # create a frame for operation buttons
@@ -218,7 +227,7 @@ class MainWindow:
         for i, name, button in zip(indexs, names, buttons):
             ttk.Button(self._operation_buttons,
                        text=name,
-                       width=3,
+                       width=3 + button_width_mod,
                        command=lambda btn=button: self.button_press(btn),
                        ).grid(row=i//2, column=i%2)
 
