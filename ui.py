@@ -5,6 +5,7 @@ from tkinter import ttk
 from calc import Calculator
 from copy import copy
 import pickle
+from enum import Enum
 import platform
 from enum import Enum
 
@@ -14,6 +15,35 @@ try:
     log = logger.print_to_console
 except ImportError:
     log = print
+
+
+class UiFrame(tk.Frame):
+    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this
+    context
+
+    Warning, the coverage for self.visible is not complete, it is only set in the pack, pack_forget, and destroy methods
+    """
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.visible = None  # set to True or False to indicate if the widget is visible or not
+
+    def pack_forget(self):
+        super().pack_forget()
+        self.visible = False
+
+    def destroy(self):
+        super().destroy()
+        self.visible = False
+
+    def pack(self, **kwargs):
+        super().pack(**kwargs)
+        self.visible = True
+
+
+class UiVisibleState(Enum):
+    STANDARD = 0
+    MINI = 1
+    CUSTOM = 2
 
 
 class CalculatorUiSettings:
@@ -26,13 +56,13 @@ class CalculatorUiSettings:
         self.last_user_function_edit_name = None
 
         # window size and appearance
-        self.stack_rows = 7
+        self.stack_rows = 2
         self.locals_rows = 10
 
         self.locals_width_key = 10
         self.locals_width_value = 260
 
-        self.stack_index_width = 5
+        self.stack_index_width = 20
         self.stack_value_width = 200
         self.stack_type_width = 50
         self.message_width = 57
@@ -43,6 +73,11 @@ class CalculatorUiSettings:
         self.locals_font = ('Arial', 12)
         self.message_font = ('Arial', 12)
         self.button_font = ('Arial', 12)
+
+        self.ui_visible_state = UiVisibleState.STANDARD
+        self.show_message_field = False
+        self.show_locals_table = False
+        self.show_buttons = False
 
 
 class CalculatorUiState:
@@ -106,180 +141,8 @@ class MainWindow:
 
         # apply the color to the root window
         self._root.config(bg=self._background_color)
-
-        # setup the root frames
-        self._top_frame = tk.Frame(self._root, background=self._background_color, padx=5, pady=5)
+        self._top_frame = UiFrame(self._root, background=self._background_color, padx=5, pady=5)
         self._top_frame.pack(fill='x', expand=True)
-        self._left_frame = tk.Frame(self._root,  width=100, background=self._background_color, padx=5, pady=5)
-        self._left_frame.pack(side='left')
-        self._right_frame = tk.Frame(self._root, width=100, background=self._background_color, padx=5, pady=5)
-        self._right_frame.pack(side='right')
-
-        """   -------------------------------------  STACK ---------------------------------------  """
-
-        # create a frame for the stack display
-        self._frame_stack = tk.Frame(self._top_frame, background=self._background_color, padx=5, pady=5)
-        self._frame_stack.pack(fill='x', expand=True) # fill='x', expand=True
-
-        # add a table with 10 rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
-        self._stack_table = ttk.Treeview(self._frame_stack, columns=( 'value', 'type',))
-
-        # set table number of visible rows to 10
-        self._stack_table['height'] = self._settings.stack_rows
-
-        self._stack_table.heading('#0', text='Index')
-        self._stack_table.heading('value', text='Value')
-        self._stack_table.heading('type', text='Type')
-        self._stack_table.column('#0', width=self._settings.stack_index_width)
-        self._stack_table.column('value', width=self._settings.stack_value_width)
-        self._stack_table.column('type', width=self._settings.stack_type_width)
-        self._stack_table.pack(fill='x', expand=True)
-
-        # add a graphic line below the stack table
-        ttk.Separator(self._frame_stack, orient='horizontal').pack()
-
-        """   -------------------------------------  Locals ---------------------------------------  """
-
-        # create a frame for the locals display
-        self._frame_locals = tk.Frame(self._top_frame, background=self._background_color, padx=5, pady=5)
-        self._frame_locals.pack(fill='x', expand=True)
-
-        # add a table with 10 rows and 2 columns named 'key', 'value', to display the locals
-        self._locals_table = ttk.Treeview(self._frame_locals, columns=('value',))
-
-        # set the font for the locals table
-
-        # add gray background to the locals table
-        self._locals_table['style'] = 'Treeview'
-        self._locals_table.tag_configure('Treeview', background='pink')
-
-        # set table number of visible rows to 10
-        self._locals_table['height'] = self._settings.locals_rows
-
-        self._locals_table.heading('#0', text='Key',)
-        self._locals_table.heading('value', text='Value')
-        self._locals_table.column('#0', width=self._settings.locals_width_key)
-        self._locals_table.column('value', width=self._settings.locals_width_value)
-        self._locals_table.pack(fill='x', expand=True)
-
-        # add a graphic line below the locals table
-        ttk.Separator(self._frame_locals, orient='horizontal').pack(fill='x')
-
-        """   -------------------------------------  BUTTONS ---------------------------------------  """
-
-        # ttk buttons ane not the same across OS, need to adjust the width of the buttons
-        if self._os_type == OsType.WINDOWS:
-            button_width_mod = 5
-        elif self._os_type == OsType.LINUX:
-            button_width_mod = 2
-        elif self._os_type == OsType.MAC:
-            button_width_mod = 0 # the original was written on a MAC so the mods are for Windows and Linux
-        else:
-            button_width_mod = 0
-
-        # create a frame for the math buttons
-        self._numeric_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
-        self._numeric_buttons.pack()
-
-        numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
-
-
-        # arrange the buttons on a grid in a standard calculator layout
-        for i, button in enumerate(numbers):
-            ttk.Button(self._numeric_buttons,
-                       text=button,
-                       command=lambda btn=button: self.button_press(btn),
-                       width=2 + button_width_mod,
-                       ).grid(row=i//3, column=i%3,)
-
-        # create a frame for the calc buttons
-        self._calc_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
-        self._calc_buttons.pack()
-
-        calc_buttons = ['delete', 'clear', 'x<->y', '1/x', 'enter', ]
-        more_buttons = ['x^2', 'x^y', 'e^x', 'pi', 'euler']
-
-        # arrange the buttons on a grid with the calc buttons on the right and the more buttons on the left
-        for i, button in enumerate(more_buttons):
-            ttk.Button(self._calc_buttons,
-                       text=button,
-                       command=lambda btn=button: self.button_press(btn),
-                       width=5 + button_width_mod,
-                       ).grid(row=i, column=0)
-        for i, button in enumerate(calc_buttons):
-            ttk.Button(self._calc_buttons,
-                       text=button,
-                       command=lambda btn=button: self.button_press(btn),
-                       width=5 + button_width_mod,
-                       ).grid(row=i, column=1)
-
-        # create a frame for operation buttons
-        self._operation_buttons = tk.Frame(self._left_frame, background=self._background_color, padx=5, pady=5)
-        # place to the right of the numeric buttons
-        self._operation_buttons.pack()
-
-        operations = {'sqrt': 'sqrt', 'sin': 'sin', 'cos': 'cos', 'tan': 'tan', 'log': 'log10', 'ln': 'ln', }
-
-        # arrange the buttons on a grid in a standard calculator layout
-        indexs = range(len(operations))
-        names = operations.keys()
-        buttons = operations.values()
-        for i, name, button in zip(indexs, names, buttons):
-            ttk.Button(self._operation_buttons,
-                       text=name,
-                       width=3 + button_width_mod,
-                       command=lambda btn=button: self.button_press(btn),
-                       ).grid(row=i//2, column=i%2)
-
-        # create a frame for the special buttons
-        self._special_buttons = tk.Frame(self._left_frame, background=self._background_color, padx=5, pady=5)
-        # place to the right of the numeric buttons
-        self._special_buttons.pack()
-
-        # create a button for 'stack to list'
-        ttk.Button(self._special_buttons,
-                     text='stack to list',
-                     command=lambda: self.button_press('stack_to_list'),
-                     ).pack(fill='x')
-
-        # create a button for 'iterable to stack'
-        ttk.Button(self._special_buttons,
-                        text='iterable to stack',
-                        command=lambda: self.button_press('iterable_to_stack'),
-                        ).pack(fill='x')
-
-        # create a button for 'stack to array'
-        ttk.Button(self._special_buttons,
-                        text='stack to array',
-                        command=lambda: self.button_press('stack_to_array'),
-                        ).pack(fill='x')
-
-        # create a button for rolling the stack
-        ttk.Button(self._special_buttons,
-                        text='roll up',
-                        command=lambda: self.button_press('roll_up'),
-                        ).pack(fill='x')
-
-        # create a button for rolling the stack down
-        ttk.Button(self._special_buttons,
-                        text='roll down',
-                        command=lambda: self.button_press('roll_down'),
-                        ).pack(fill='x')
-
-        # create a button for showing a plot
-        ttk.Button(self._special_buttons,
-                        text='plot',
-                        command=lambda: self.show_plot(),
-                        ).pack(fill='x')
-
-        """ -------------------------------------  MESSAGE FIELD --------------------------------------- """
-
-        # add a field at the bottom for text messages
-        self._message_field = tk.Text(self._top_frame, state='normal', height=2, font=self._settings.message_font)
-        # set width with settings
-        self._message_field.config(width=self._settings.message_width)
-
-        self._message_field.pack(fill='x')
 
         """  -------------------------------------  User Menu ---------------------------------------"""
 
@@ -311,8 +174,11 @@ class MainWindow:
         # add a 'undo' option to the edit menu
         self._edit_menu.add_command(label='Undo (ctrl+z)', command=self.undo_last_action)
 
+        # add a 'clear stack' option to the edit menu
+        self._edit_menu.add_command(label='Clear stack', command=self.clear_stack)
+
         # add a 'clear all variables' option to the file menu
-        self._file_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
+        self._edit_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
 
         # VIEW MENU ........................
 
@@ -321,6 +187,42 @@ class MainWindow:
 
         # add a 'show all functions' option to the view menu that opens a popup window
         self._view_menu.add_command(label='Show all functions', command=self.popup_show_all_functions)
+
+        # add a seperator line
+        self._view_menu.add_separator()
+
+        # add a 'show message field' option to the view menu
+        self._tk_var_menu_view_show_message_field = tk.BooleanVar()
+        self._view_menu.add_checkbutton(label='Show message field',
+                                        onvalue=True,
+                                        offvalue=False,
+                                        variable=self._tk_var_menu_view_show_message_field,
+                                        command=self._menu_view_show_message_field, )
+
+        # add a 'show locals table' option to the view menu
+        self._tk_var_menu_view_show_locals_table = tk.BooleanVar()
+        self._view_menu.add_checkbutton(label='Show locals table',
+                                        onvalue=True,
+                                        offvalue=False,
+                                        variable=self._tk_var_menu_view_show_locals_table,
+                                        command=self._menu_view_show_locals_table, )
+
+        # add a 'show buttons' option to the view menu
+        self._tk_var_menu_view_show_buttons = tk.BooleanVar()
+        self._view_menu.add_checkbutton(label='Show buttons',
+                                        onvalue=True,
+                                        offvalue=False,
+                                        variable=self._tk_var_menu_view_show_buttons,
+                                        command=self._menu_view_show_buttons, )
+
+        # add a seperator
+        self._view_menu.add_separator()
+
+        # add a  'Standard View' option to the view menu
+        self._view_menu.add_command(label='Standard View', command=self._apply_standard_view)
+
+        # add a 'Mini View' option to the view menu
+        self._view_menu.add_command(label='Mini View', command=self._apply_mini_view)
 
         # OPTIONS MENU ........................
 
@@ -399,14 +301,323 @@ class MainWindow:
         # bind the program exit to the exit method
         self._root.protocol("WM_DELETE_WINDOW", self.user_exit)
 
-        """  --------------------------------------- Do some housekeeping ---------------------------------------  """
+        """  ----------------------------  Stack, Messages, Locals, Buttons ---------------------------------------  """
 
-        # when the program launches, if the previous state was pulled in the UI needs to update to show the state
-        self._update_stack_display()
-        self._update_locals_display()
-        self._update_message_display()
+        stack_rows = self._settings.stack_rows
+        self._update_visible_ui_object_stack(number_visible_rows=stack_rows)  # sets up the visible UI objects based on the settings
+
+        vis = self._settings.show_message_field
+        self._set_visibility_message_field(vis)
+
+        vis = self._settings.show_locals_table
+        self._set_visibility_locals_table(vis)
+
+        vis = self._settings.show_buttons
+        self._set_visibility_buttons(vis)
 
         """ ------------------------------------- END __init__() ------------------------------------------------- """
+
+    def _update_visible_ui_object_stack(self, number_visible_rows=6):
+        """ updates the visible UI objects based on the settings """
+        """   -------------------------------------  STACK ---------------------------------------  """
+        exists = hasattr(self, '_frame_stack') # the way this gets called we need to check before creating
+        if not exists:
+            # create a frame for the stack display
+            self._frame_stack = UiFrame(self._top_frame, background=self._background_color, padx=5, pady=5)
+            self._frame_stack.pack(fill='x', expand=True)  # fill='x', expand=True
+
+            # add a table with 10 rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
+            self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type',))
+            self._stack_table.heading('#0', text='Index')
+            self._stack_table.heading('value', text='Value')
+            self._stack_table.heading('type', text='Type')
+            self._stack_table.pack(fill='x', expand=True)
+
+            # add a graphic line below the stack table
+            ttk.Separator(self._frame_stack, orient='horizontal').pack()
+
+        # set table number of visible rows
+        if number_visible_rows is not None:
+            self._settings.stack_rows = number_visible_rows
+        self._stack_table['height'] = self._settings.stack_rows
+        self._stack_table.column('#0', width=self._settings.stack_index_width)
+        self._stack_table.column('value', width=self._settings.stack_value_width)
+        self._stack_table.column('type', width=self._settings.stack_type_width)
+
+        self._update_stack_display()
+
+    def _update_visible_ui_object_message_field(self):
+        log(f'error deprecated - message field')
+
+
+    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
+
+    @ staticmethod
+    def _get_menu_item_by_label( menu: tk.Menu, label: str):
+        """ returns a menu item by passing the menu object and the label of the item
+        @param menu: tk.Menu, the menu object to search
+        @param label: str, the label of the menu item to search for"""
+        for item in menu:
+            if item.cget('label') == label:
+                return item
+
+    def _set_visibility_locals_table(self, state: bool, number_of_visible_rows=10):
+        """ sets the visibility of the locals table based on the state """
+        if state is True:
+            self._settings.show_locals_table = True
+            self._tk_var_menu_view_show_locals_table.set(True)
+        else:
+            self._settings.show_locals_table = False
+            self._tk_var_menu_view_show_locals_table.set(False)
+
+        """   -------------------------------------  Locals ---------------------------------------  """
+
+        if self._settings.show_locals_table is True:
+            self._view_menu.entryconfig('Show locals table', state='normal')
+            # create a frame for the locals display
+            self._frame_locals = UiFrame(self._top_frame, background=self._background_color, padx=5, pady=5)
+            if self._settings.show_locals_table is True:
+                self._frame_locals.pack(fill='x', expand=True)
+
+            # add a table with 10 rows and 2 columns named 'key', 'value', to display the locals
+            self._locals_table = ttk.Treeview(self._frame_locals, columns=('value',))
+
+            # set the font for the locals table
+
+            # add gray background to the locals table
+            self._locals_table['style'] = 'Treeview'
+            self._locals_table.tag_configure('Treeview', background='pink')
+
+            # set table number of visible rows
+            if number_of_visible_rows is not None:
+                self._settings.locals_rows = number_of_visible_rows
+            self._locals_table['height'] = self._settings.locals_rows
+
+            self._locals_table.heading('#0', text='Key', )
+            self._locals_table.heading('value', text='Value')
+            self._locals_table.column('#0', width=self._settings.locals_width_key)
+            self._locals_table.column('value', width=self._settings.locals_width_value)
+            self._locals_table.pack(fill='x', expand=True)
+
+            # add a graphic line below the locals table
+            ttk.Separator(self._frame_locals, orient='horizontal').pack(fill='x')
+
+            self._update_locals_display()
+
+        else:
+            exists = hasattr(self, '_frame_locals')
+            if exists:
+                self._frame_locals.destroy()
+    def _set_visibility_buttons(self, state: bool):
+        """ sets the visibility of the buttons based on the state """
+        if state is True:
+            self._settings.show_buttons = True
+            self._tk_var_menu_view_show_buttons.set(True)
+        else:
+            self._settings.show_buttons = False
+            self._tk_var_menu_view_show_buttons.set(False)
+
+        if self._settings.show_buttons is True:
+            bg_color = self._background_color
+            self._bottom_button_frame = UiFrame(self._root, background=bg_color, padx=5, pady=5)
+            self._bottom_button_frame.pack(fill='x', expand=True)
+            self._left_frame = UiFrame(self._bottom_button_frame, width=100, background=bg_color, padx=5, pady=5)
+            self._left_frame.pack(side='left')
+            self._right_frame = UiFrame(self._bottom_button_frame, width=100, background=bg_color, padx=5, pady=5)
+            self._right_frame.pack(side='right')
+        else:
+            pass # do this at the end of the method too to destroy the buttons
+
+        # Numeric buttons --------------------------------
+
+        if self._settings.show_buttons is True:
+            # create a frame for the math buttons
+            self._numeric_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
+            numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
+        # ttk buttons ane not the same across OS, need to adjust the width of the buttons
+        if self._os_type == OsType.WINDOWS:
+            button_width_mod = 5
+        elif self._os_type == OsType.LINUX:
+            button_width_mod = 2
+        elif self._os_type == OsType.MAC:
+            button_width_mod = 0 # the original was written on a MAC so the mods are for Windows and Linux
+        else:
+            button_width_mod = 0
+
+        # create a frame for the math buttons
+        self._numeric_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
+        self._numeric_buttons.pack()
+
+        numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
+
+            # arrange the buttons on a grid in a standard calculator layout
+            for i, button in enumerate(numbers):
+                ttk.Button(self._numeric_buttons,
+                           text=button,
+                           command=lambda btn=button: self.button_press(btn),
+                           width=2,
+                           ).grid(row=i // 3, column=i % 3, )
+
+            self._numeric_buttons.pack()
+        else:
+            exists = hasattr(self, '_numeric_buttons')
+            if exists:
+                self._numeric_buttons.destroy()
+
+        # Calculation Buttons ---------------------------
+
+        if self._settings.show_buttons is True:
+            # create a frame for the calc buttons
+            self._calc_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
+            calc_buttons = ['delete', 'clear', 'x<->y', '1/x', 'enter', ]
+            more_buttons = ['x^2', 'x^y', 'e^x', 'pi', 'euler']
+
+            # arrange the buttons on a grid with the calc buttons on the right and the more buttons on the left
+            for i, button in enumerate(more_buttons):
+                ttk.Button(self._calc_buttons,
+                           text=button,
+                           command=lambda btn=button: self.button_press(btn),
+                           width=5,
+                           ).grid(row=i, column=0)
+            for i, button in enumerate(calc_buttons):
+                ttk.Button(self._calc_buttons,
+                           text=button,
+                           command=lambda btn=button: self.button_press(btn),
+                           width=5,
+                           ).grid(row=i, column=1)
+            self._calc_buttons.pack()
+        else:
+            exists = hasattr(self, '_calc_buttons')
+            if exists:
+                self._calc_buttons.destroy()
+
+        # Operation Buttons ---------------------------
+
+        if self._settings.show_buttons is True:
+            # create a frame for operation buttons
+            self._operation_buttons = UiFrame(self._left_frame, background=self._background_color, padx=5, pady=5)
+            operations = {'sqrt': 'sqrt', 'sin': 'sin', 'cos': 'cos', 'tan': 'tan', 'log': 'log10', 'ln': 'ln', }
+
+            # arrange the buttons on a grid in a standard calculator layout
+            indexs = range(len(operations))
+            names = operations.keys()
+            buttons = operations.values()
+            for i, name, button in zip(indexs, names, buttons):
+                ttk.Button(self._operation_buttons,
+                           text=name,
+                           width=3,
+                           command=lambda btn=button: self.button_press(btn),
+                           ).grid(row=i // 2, column=i % 2)
+
+            self._operation_buttons.pack()
+        else:
+            exists = hasattr(self, '_operation_buttons')
+            if exists:
+                self._operation_buttons.destroy()
+
+        # Special Buttons ---------------------------
+
+        if self._settings.show_buttons is True:
+            # create a frame for the special buttons
+            self._special_buttons = UiFrame(self._left_frame, background=self._background_color, padx=5, pady=5)
+            # place to the right of the numeric buttons
+
+            # create a button for 'stack to list'
+            ttk.Button(self._special_buttons,
+                       text='stack to list',
+                       command=lambda: self.button_press('stack_to_list'),
+                       ).pack(fill='x')
+
+            # create a button for 'iterable to stack'
+            ttk.Button(self._special_buttons,
+                       text='iterable to stack',
+                       command=lambda: self.button_press('iterable_to_stack'),
+                       ).pack(fill='x')
+
+            # create a button for 'stack to array'
+            ttk.Button(self._special_buttons,
+                       text='stack to array',
+                       command=lambda: self.button_press('stack_to_array'),
+                       ).pack(fill='x')
+
+            # create a button for rolling the stack
+            ttk.Button(self._special_buttons,
+                       text='roll up',
+                       command=lambda: self.button_press('roll_up'),
+                       ).pack(fill='x')
+
+            # create a button for rolling the stack down
+            ttk.Button(self._special_buttons,
+                       text='roll down',
+                       command=lambda: self.button_press('roll_down'),
+                       ).pack(fill='x')
+
+            # create a button for showing a plot
+            ttk.Button(self._special_buttons,
+                       text='plot',
+                       command=lambda: self.show_plot(),
+                       ).pack(fill='x')
+
+            self._special_buttons.pack()
+        else:
+            exists = hasattr(self, '_special_buttons')
+            if exists:
+                self._special_buttons.destroy()
+
+        if self._settings.show_buttons is False:
+            exists = hasattr(self, '_left_frame')
+            if exists:
+                self._left_frame.destroy()
+
+            exists = hasattr(self, '_right_frame')
+            if exists:
+                self._right_frame.destroy()
+
+            exists = hasattr(self, '_bottom_button_frame')
+            if exists:
+                self._bottom_button_frame.destroy()
+
+    def _set_visibility_message_field(self, state: bool):
+        """ sets the visibility of the message field based on the state """
+        if state is True:
+            # add a field at the bottom for text messages
+            self._message_field = tk.Text(self._top_frame, state='normal', height=2, font=self._settings.message_font)
+            # set width with settings
+            self._message_field.config(width=self._settings.message_width)
+            self._message_field.pack()
+            self._settings.show_message_field = True
+            self._tk_var_menu_view_show_message_field.set(True)
+            self._update_message_display()
+        else:
+            exists = hasattr(self, '_message_field')
+            if exists:
+                self._message_field.destroy()
+            self._settings.show_message_field = False
+            self._tk_var_menu_view_show_message_field.set(False)
+
+    def _menu_view_show_message_field(self):
+        """ toggles the visibility of the message field """
+        self._settings.ui_visible_state = UiVisibleState.CUSTOM
+        if self._settings.show_message_field is True:
+            self._set_visibility_message_field(False)
+        else:
+            self._set_visibility_message_field(True)
+
+    def _menu_view_show_locals_table(self):
+        """ toggles the visibility of the locals table """
+        self._settings.ui_visible_state = UiVisibleState.CUSTOM
+        if self._settings.show_locals_table is True:
+            self._set_visibility_locals_table(False)
+        else:
+            self._set_visibility_locals_table(True)
+
+    def _menu_view_show_buttons(self):
+        """ toggles the visibility of the buttons """
+        self._settings.ui_visible_state = UiVisibleState.CUSTOM
+        if self._settings.show_buttons is True:
+            self._set_visibility_buttons(False)
+        else:
+            self._set_visibility_buttons(True)
 
     def popup_confirm_clear_all_user_functions(self):
         """ opens a popup window to confirm the user wants to clear all user functions """
@@ -514,8 +725,6 @@ class MainWindow:
         window = tk.Toplevel(self._root)
         window.title('All Functions')
 
-
-
         # create a text entry field
         entry = tk.Text(window, height=50, width=75)
         func_dict = self._c.return_all_functions()
@@ -537,11 +746,8 @@ class MainWindow:
         scroll.config(command=entry.yview)
         entry.pack()
 
-
-
         # add a numeric filed at the bottom of the window that shows the number of functions
         ttk.Label(window, text=f"Number of functions: {len(func_dict)}").pack()
-
 
         # create a button to cancel the changes
         ttk.Button(window, text='Close', command=window.destroy).pack()
@@ -810,6 +1016,30 @@ class MainWindow:
         self._update_message_display()
         self._update_locals_display()
 
+    def _apply_standard_view(self):
+
+        if self._settings.ui_visible_state != UiVisibleState.STANDARD:
+            # first destroy all by setting to false then re-build by setting to true, this resets the UI
+            self._set_visibility_message_field(False)
+            self._set_visibility_locals_table(False, number_of_visible_rows=6)
+            self._set_visibility_buttons(False)
+
+            self._update_visible_ui_object_stack(number_visible_rows=6)
+            self._set_visibility_message_field(True)
+            self._set_visibility_locals_table(True, number_of_visible_rows=6)
+            self._set_visibility_buttons(True)
+
+            self._settings.ui_visible_state = UiVisibleState.STANDARD
+
+    def _apply_mini_view(self):
+
+        if self._settings.ui_visible_state != UiVisibleState.MINI:
+            self._update_visible_ui_object_stack(number_visible_rows=2)
+            self._set_visibility_message_field(False)
+            self._set_visibility_locals_table(False)
+            self._set_visibility_buttons(False)
+            self._settings.ui_visible_state = UiVisibleState.MINI
+
     # define a method for updating the stak table
     def _update_stack_display(self):
         # clear the ui table
@@ -818,7 +1048,7 @@ class MainWindow:
         for stack_index in range(self._settings.stack_rows).__reversed__():
 
             stack_entry = self._c.return_stack_for_display(stack_index)
-            entry_type = type(stack_entry)
+            entry_type = type(stack_entry).__name__
 
             # having number, hex and binary output simultaneously was fun but not very useful, keep for "developer" mode
             # try:
@@ -872,30 +1102,32 @@ class MainWindow:
         will override getting the message from the calculator, this is useful for displaying
         UI context messages to the user
         """
-        self._message_field.config(state='normal')
-        self._message_field.delete('1.0', 'end')
+        if self._settings.show_message_field is True:
+            self._message_field.config(state='normal')
+            self._message_field.delete('1.0', 'end')
 
-        if direct_message is not None:
-            self._message_field.insert(direct_message)
-        else:
-            msg = self._c.return_message()
-            if msg is not None:
-                self._message_field.insert('1.0', msg)
+            if direct_message is not None:
+                self._message_field.insert(direct_message)
+            else:
+                msg = self._c.return_message()
+                if msg is not None:
+                    self._message_field.insert('1.0', msg)
 
-        self._message_field.config(state='normal')
+            self._message_field.config(state='normal')
 
     def _update_locals_display(self):
-        # clear the ui table
-        self._locals_table.delete(*self._locals_table.get_children())
+        if self._settings.show_locals_table is True:
+            # clear the ui table
+            self._locals_table.delete(*self._locals_table.get_children())
 
-        for key, value in self._c.return_locals().items():
-            formatted_value = str(value)
-            # log(f"update locals:: key: {key}, value: {formatted_value}")
-            self._locals_table.insert('',
-                                         'end',
-                                         text=key,
-                                         value=(formatted_value,),
-                                     )
+            for key, value in self._c.return_locals().items():
+                formatted_value = str(value)
+                # log(f"update locals:: key: {key}, value: {formatted_value}")
+                self._locals_table.insert('',
+                                             'end',
+                                             text=key,
+                                             value=(formatted_value,),
+                                         )
     def launch_ui(self):
         """ launches the main window by calling the Tk mainloop method """
         self._root.mainloop()
