@@ -14,7 +14,7 @@ neither one
 offers the simplicity or immediacy of a good old fashion calculator when working math problems. But a traditional 
 calculator 
 lacks the history and exposition of a Jupyter notebook and the power and massive catalog of tools available in Python. 
-Why not incorporate strengths of all into one App. 
+Why not incorporate the strengths of all into one App. 
 So this project was born and has become a go-to tool for daily engineering math and quick Python scripting.
 
 ### Highlights
@@ -30,7 +30,7 @@ So this project was born and has become a go-to tool for daily engineering math 
 - [x] Support for copy and pasting between excel and the calculator
 - [x] Session history with undo and redo
 - [x] Store variables of any type including numbers, arrays, functions, class instances, and more
-- [x] Save / Restore sessions and state, by default launches with the last starte 
+- [x] Save / Restore sessions and state, by default launches with the last state 
 - [x] Dark mode and light mode themes (tracks the system theme)
 
 ### Intended Users
@@ -129,7 +129,7 @@ always base 10.
 
 #### Non RPN style calculations
 
-1) enter: '(1+1)' -- the parentheses let the calculator know that this is a math expression
+1) enter: '(1+1)' -- the parentheses lets the calculator know that this is a math expression
 2) press: 'enter' -- this will evaluate the expression 1+1 and display the result '2' in the stack view
 
 #### Making lists and arrays
@@ -159,9 +159,9 @@ The Calculator uses the awesome Matplotlib library to plot data.
 
 1) enter: '[10, 7, 4, 2, 7, 4, 9, 0, 1, -3]'
 2) press: 'enter' -- this will evaluate the value on the stack to a list type object 
-3) press: 'plot' -- this will plot the array using matplotlib and display the plot in a new window
+3) press: 'plot' -- this will plot the list using matplotlib and display the plot in a new window
 
-Note that you can copy values in Excel or Google Sheets and paste them directly into the calculator.
+Note that you can copy rows and columns in Excel or Google Sheets and paste them directly into the calculator.
 
 ![PyCalc](media/PyCalc-PlotExampleA.jpg)
 
@@ -215,7 +215,7 @@ and display the result in the stack view
 
 #### Saving and Restoring Sessions
 
-The calculator has the ability to save and restore sessions. By default the calculator will save it's state on exit
+The calculator has the ability to save and restore sessions. By default the calculator will save its state on exit
 and load the state on start. The state is saved in the directory where the calculator is run from as 
 "last_state_autosave.pycalc". The save and restore state includes the stack, history, variables and calculator settings.
 

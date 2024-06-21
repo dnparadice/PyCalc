@@ -13,7 +13,6 @@ try:
 except ImportError:
     log = print
 
-
 class Calculator:
     """ A class that implements the backend of an RPN style calculator with the ability to perform RPN style operations
     on numbers AND python objects. The primary interface is the 'user_entry(input: any)' method which can handle most
@@ -41,7 +40,7 @@ class Calculator:
 
     def __init__(self):
         self._stack = []
-        self._last_stack_entry = None
+        self._last_stack_operation = None
         self._stack_history_length = 100 # units are in number of saved stacks, not a memory size
         self._stack_history = [] # a list of stacks, use the update_stack_history() method to prevent mem runaway
         self._message = None
@@ -53,6 +52,7 @@ class Calculator:
         self._imported_functions = set() # a set of all imported functions
         self._user_functions = dict() # a dict of all user defined functions like {'name': '<function def text>'}
         self._all_functions = set() # a set of all possible functions that can be called including buttons and imports
+        self._setting_invert_lists = True  # when using stack to list/array this flips the direction of the list
 
         # use the awesome math lib to grab some pre-defined math methods ....  mathods?
         math_lib_functions = dir(math)
@@ -114,6 +114,9 @@ class Calculator:
                                     '/': lambda: self.stack_operation('/'),
                                     '**': lambda: self.stack_operation('**'),
                                     '!': lambda: self.stack_function_press('factorial'),
+                                    'x^2': lambda : self.raise_pow_2(),
+                                    'x^y': lambda : self.raise_pow_x(),
+
 
                                     # constants
                                     'pi': lambda: self._constant_press('3.14159265'),
@@ -127,10 +130,10 @@ class Calculator:
                                     'dup': lambda: self.stack_put(self._stack[0], shift_up=True),
                                     'rot': lambda: self.roll_down(),
                                     'swap_x_y': lambda: self.swap_x_y(),
-                                    'X<->Y': lambda: self.swap_x_y(),
+                                    'x<->y': lambda: self.swap_x_y(),
                                     'negate': lambda: self.negate_x(),
                                     '+/-': lambda: self.negate_x(),
-                                    '1/X': lambda: self.reciprocal_x(),
+                                    '1/x': lambda: self.reciprocal_x(),
                                     'recip': lambda: self.reciprocal_x(),
                                     'iterable_to_stack': lambda: self.iterable_to_stack(),
                                     'stack_to_list': lambda: self.stack_to_list(),
@@ -176,17 +179,81 @@ class Calculator:
         self._message = None
         if len(self._stack_history) > 0:
             self._stack = self._stack_history.pop(-1)
-            self._message = f"Undo: restored stack to previous state"
+            self._message = f"Undo: restored stack to previous state. History Length: '{len(self._stack_history)}'"
         else:
             self._message = f"Error: no history to undo"
             log(self._message)
 
     """ -------------------------------- Math Wrapper Functions -------------------------------- """
 
+    def raise_pow_2(self):
+        """ raises the value in X to the power of 2 """
+        self._message = None
+        if len(self._stack) > 0:
+            self._update_stack_history()
+            x = self._stack.pop(0)
+            try:
+                x = self._convert_to_best_numeric(x)
+                result = x ** 2
+                self.stack_put(result)
+                self._message = f"Function: x^2({x}) = {result}"
+            except Exception as ex:
+                self.stack_put(x)
+                self._message = f"Error: cant raise x to the power of 2: '{x}' with error: '{ex}'"
+                log(self._message)
+                return
+        else:
+            self._message = f"Error: not enough values on the stack to perform the operation: 'x^2'"
+            log(self._message)
+
+    def raise_pow_x(self):
+        """ raises y to the power of x"""
+        self._message = None
+        if len(self._stack) > 1:
+            self._update_stack_history()
+            x = self._stack.pop(0)
+            y = self._stack.pop(0)
+            try:
+                x = self._convert_to_best_numeric(x)
+                y = self._convert_to_best_numeric(y)
+                result = y ** x
+                self.stack_put(result)
+                self._message = f"Function: x^y({x}, {y}) = {result}"
+            except Exception as ex:
+                self.stack_put(y)
+                self.stack_put(x)
+                self._message = f"Error: cant raise y to the power of x: '{y}' and '{x}' with error: '{ex}'"
+                log(self._message)
+                return
+        else:
+            self._message = f"Error: not enough values on the stack to perform the operation: 'x^y'"
+            log(self._message)
+
+    def raise_pow_e(self):
+        """ raises e to the power of x """
+        self._message = None
+        if len(self._stack) > 0:
+            self._update_stack_history()
+            x = self._stack.pop(0)
+            try:
+                x = self._convert_to_best_numeric(x)
+                result = math.exp(x)
+                self.stack_put(result)
+                self._message = f"Function: e^x({x}) = {result}"
+            except Exception as ex:
+                self.stack_put(x)
+                self._message = f"Error: cant raise e to the power of x: '{x}' with error: '{ex}'"
+                log(self._message)
+                return
+        else:
+            self._message = f"Error: not enough values on the stack to perform the operation: 'e^x'"
+            log(self._message)
+
     def natural_log(self):
         """ takes the natural log of the value in X """
         self._message = None
         if len(self._stack) > 0:
+            self._update_stack_history()
             x = self._stack.pop(0)
             try:
                 x = self._convert_to_best_numeric(x)
@@ -206,6 +273,7 @@ class Calculator:
         """ calculates the number of ways to choose r items from a set of n items where r=x and n=y """
         self._message = None
         if len(self._stack) > 1:
+            self._update_stack_history()
             r = self._stack.pop(0)
             n = self._stack.pop(0)
             try:
@@ -229,6 +297,7 @@ class Calculator:
         """
         self._message = None
         if len(self._stack) > 1:
+            self._update_stack_history()
             r = self._stack.pop(0)
             n = self._stack.pop(0)
             try:
@@ -251,6 +320,7 @@ class Calculator:
         """ negates the value in x """
         self._message = None
         if len(self._stack) > 0:
+            self._update_stack_history()
             x = self._stack.pop(0)
             try:
                 x = self._convert_to_best_numeric(x)
@@ -270,6 +340,7 @@ class Calculator:
         """ takes the reciprocal of the value in X """
         self._message = None
         if len(self._stack) > 0:
+            self._update_stack_history()
             x = self._stack.pop(0)
             try:
                 x = self._convert_to_best_numeric(x)
@@ -291,6 +362,7 @@ class Calculator:
         """ swaps the values in X and Y """
         self._message = None
         if len(self._stack) > 1:
+            self._update_stack_history()
             x = self._stack.pop(0)
             y = self._stack.pop(0)
             self.stack_put(x)
@@ -361,7 +433,7 @@ class Calculator:
 
             # if not in the function dict, its a string entry
             # if the last stack entry was 'enter' then the user is entering a new string value
-            if self._last_stack_entry == 'enter':
+            if self._last_stack_operation == 'enter':
                 self.stack_put(user_input, shift_up=False)
 
             else:
@@ -384,7 +456,7 @@ class Calculator:
             self.stack_put(user_input)
 
         # do some housekeeping for the calc object
-        self._last_stack_entry = user_input
+        self._last_stack_operation = 'user_entry'
         # self._print_stack()   # for debugging
 
     def one_arg_function_press(self, function):
@@ -554,7 +626,7 @@ class Calculator:
                     self.stack_put(x)
                     log(self._message)
 
-        self._last_stack_entry = 'function'
+        self._last_stack_operation = 'function'
 
     def stack_put(self, value, position=0, shift_up=True):
         """Put a value into the stack at a given position.
@@ -563,7 +635,7 @@ class Calculator:
         @param shift_up: If True, shift the values above the position up.
         @return: None, if success the value is on the stack, if failure an error message is stored to the message field
         """
-        self._update_stack_history() # if changing the stack save the state first
+        # self._update_stack_history() # if changing the stack save the state first, um this captures every keypress
         if shift_up:
             self._stack = self._stack[:position] + [value] + self._stack[position:]
         else:
@@ -579,6 +651,7 @@ class Calculator:
 
     def enter_press(self):
         """ do something reasonable when the user presses enter. Returns on first success or fatal error """
+        self._update_stack_history()
         self._message = None
 
         if len(self._stack) > 0:  # else do nothing
@@ -594,14 +667,14 @@ class Calculator:
                 if x_ref in self._locals:
                     self._stack.pop(0) # clear the name from the stack
                     self.stack_put(self._locals[x_ref])
-                    self._last_stack_entry = 'recall'
+                    self._last_stack_operation = 'recall'
                     return # ------------------------------------------------------------------------------------------>
 
             # .........................................
             #   Handle variable assignment
             # .........................................
             # if an '=' char is found in X then it is most likely an assignment
-            if self._last_stack_entry != 'assignment':  # you have to press enter after an assignment
+            if self._last_stack_operation != 'assignment':  # you have to press enter after an assignment
 
                 if isinstance(self._stack[0], str):
                     if '=' in self._stack[0]:
@@ -632,7 +705,7 @@ class Calculator:
                                 self._message = f"Error: cant assign variable to built in: '{var_key}'"
                                 self.stack_put(var_value)
                                 self.stack_put(var_key)
-                                self._last_stack_entry = 'error'
+                                self._last_stack_operation = 'error'
                                 log(self._message)
                                 return # ------------------------------------------------------------------------------>
                             self._locals.update({var_key: var_value})
@@ -642,7 +715,7 @@ class Calculator:
                                 self._exec_globals.update({key: value})
                             self.stack_put(var_value)
                             self._message = f"Assignment: {var_key} = {var_value}"
-                            self._last_stack_entry = 'assignment'
+                            self._last_stack_operation = 'assignment'
                             log(self._message)
                             return  # --------------------------------------------------------------------------------->
 
@@ -657,11 +730,7 @@ class Calculator:
             # if the only thing in X is a number, then duplicate the number in X into X so that X is in both X and Y
             try:
                 x = self._stack.pop(0)
-                number = float(x)  # even ints can be floats
-                # check if it can be an int
-                if number.is_integer():
-                    number = int(number)
-
+                number = self._convert_to_best_numeric(x)  # this will raise an exception if x is not a number
                 self.stack_put(number, shift_up=True)
                 self._duplicate_x_value_in_y_position()
                 return # ---------------------------------------------------------------------------------------------->
@@ -700,7 +769,7 @@ class Calculator:
                             result = eval(exc_str, self._exec_globals)(Y)
                             self._message = f"Evaluated: {exc_str}{Y} to {result}"
                             self.stack_put(result)
-                            self._last_stack_entry = 'function'
+                            self._last_stack_operation = 'function'
                             return  # ----------------------------------------------------------------------------->
                         except Exception as ex:
                             pass # try the next lib
@@ -730,12 +799,12 @@ class Calculator:
                         self._message = f"Error in enter_press: eval: '{x_temp}({Y})' with exceptions ex: {ex}"
                         self.stack_put(Y)
 
-                self._last_stack_entry = 'eval'
+                self._last_stack_operation = 'eval'
                 self.stack_put(result)
             except Exception as ex:
                 try:
                     exec(x_temp, self._exec_globals)  # this works on input like 'import os' with no return value
-                    self._last_stack_entry = 'exec'
+                    self._last_stack_operation = 'exec'
                     self._message = f"Executed: {x_temp}"
 
                     # ------- Handle Imports -------
@@ -770,11 +839,12 @@ class Calculator:
                     # todo: set a flag to dup X on enter error, this is a string that cant be parsed ..
                     # but maybe the user wants to use it as a string
                     self.stack_put(x_temp)
-                    self._last_stack_entry = 'enter'
+                    self._last_stack_operation = 'enter'
             log(self._message)
 
     def _duplicate_x_value_in_y_position(self):
         """ duplicates the value in X to Y """
+        self._update_stack_history()
         try:
             x_ref = str(self._stack[0])
             if x_ref in self._button_functions:
@@ -782,7 +852,7 @@ class Calculator:
                 self.user_entry(x_temp)
             else:
                 self.stack_put(self._stack[0])
-                self._last_stack_entry = 'enter'
+                self._last_stack_operation = 'enter'
                 return  # --------------------------------------------------------------------------------------------->
         except Exception as ex:
             self._message = f"Error in enter_press: copy X to Y: {ex}"
@@ -791,6 +861,7 @@ class Calculator:
         """ performs the operation on the stack X and Y values and puts the result back on the stack
          @param operation: the operation to perform on the two values
          """
+        self._update_stack_history()
         self._message = None
 
         if len(self._stack) > 1:
@@ -859,11 +930,23 @@ class Calculator:
         """ converts all items on the stack into a list where X is at list position 0, Y is at list position 1, etc ...
          and puts the list back on the stack at X. Of note, this is python so the list can contain multiple types
         of objects like strings and numbers and other lists, whatever you want. """
-        self._message = None
-        stack_hold = self._stack    # surprise! it's already a list : )
-        self.clear_stack()
-        self.stack_put(stack_hold)
-        self._message = f"Stack to list: {stack_hold}"
+        if len(self._stack) > 0:
+            self._update_stack_history()
+            x = self._stack.pop(0)
+            try:
+                number = self._convert_to_best_numeric(x)
+                self.stack_put(number)
+            except ValueError:
+                self.stack_put(x)
+            self._message = None
+            stack_hold = self._stack    # surprise! it's already a list : )
+            self.clear_stack()
+            if self._setting_invert_lists is True:
+                r_stack = list(reversed(stack_hold))
+            else:
+                r_stack = stack_hold
+            self.stack_put(r_stack)
+            self._message = f"Stack to list: {r_stack}"
 
     def stack_to_array(self):
         """ converts all items on the stack into a numpy array where X is at array position 0,
@@ -874,53 +957,64 @@ class Calculator:
         Note: the data type of X will be used first to set the dtype for the array, if that fails then float is used,
         if float fails the native data typs is used, for example if X is a list of strings, the array will be an
         array of lists of strings (like [['1', '2', '3'], ['4', '5', '6']]) """
-        self._message = None
-        stack_hold = self._stack
-
-        # look at X data type, we will try to use that as the dtype for the array
-        dtype = type(self._stack[0])
-        if dtype == str: # since this is a calculator, prefer numbers to strings for arrays
+        if len(self._stack) > 0:
+            self._update_stack_history()
+            self._message = None
             try:
-                num = self._convert_to_best_numeric(self._stack[0])
-            except ValueError:
-                dtype = str
-            else:
-                dtype = type(num)
-        try:
-            array = np.array(stack_hold, dtype=dtype)
-        except Exception as ex:
+                number = self._convert_to_best_numeric(self._stack[0])
+            except ValueError as ex:
+                pass  # whatever is at X, is not a number but that is ok
 
-            try: # try an int
-                int_list = [int(x) for x in stack_hold]
-                array = np.array(int_list, dtype=int)
+            stack_hold = self._stack
+            r_stack = stack_hold
+            if self._setting_invert_lists is True:
+                r_stack = list(reversed(stack_hold))
 
-            except Exception as ei:
+            # look at X data type, we will try to use that as the dtype for the array
+            dtype = type(self._stack[0])
+            if dtype == str: # since this is a calculator, prefer numbers to strings for arrays
+                try:
+                    num = self._convert_to_best_numeric(self._stack[0])
+                except ValueError:
+                    dtype = str
+                else:
+                    dtype = type(num)
+            try:
+                array = np.array(reversed, dtype=dtype)
+            except Exception as ex:
 
-                try: # try a float
-                    float_list = [float(x) for x in stack_hold]
-                    array = np.array(float_list, dtype=float)
-                except Exception as ef:
+                try: # try an int
+                    int_list = [int(x) for x in r_stack]
+                    array = np.array(int_list, dtype=int)
 
-                    try: # try a string
-                        string_list = [str(x) for x in stack_hold]
-                        array = np.array(string_list, dtype=str)
-                    except Exception as es:
-                        self._message = (f"Error in stack to array, cant convert data type: '{dtype}', to array. "
-                                         f"check for homogeneity in the stack: '{[type(x) for x in stack_hold]}'"
-                                         f"errors: '{ex}', '{ei}', '{ef}', '{es}'")
-                        # restore the stack
-                        self._stack = stack_hold
-                        log(self._message)
-                        return # -------------------------------------------------------------------------------------->
+                except Exception as ei:
 
-        self.clear_stack()
-        self.stack_put(array)
-        self._message = f"Stack to array: {array}"
+                    try: # try a float
+                        float_list = [float(x) for x in r_stack]
+                        array = np.array(float_list, dtype=float)
+                    except Exception as ef:
+
+                        try: # try a string
+                            string_list = [str(x) for x in r_stack]
+                            array = np.array(string_list, dtype=str)
+                        except Exception as es:
+                            self._message = (f"Error in stack to array, cant convert data type: '{dtype}', to array. "
+                                             f"check for homogeneity in the stack: '{[type(x) for x in r_stack]}'"
+                                             f"errors: '{ex}', '{ei}', '{ef}', '{es}'")
+                            # restore the stack
+                            self._stack = stack_hold
+                            log(self._message)
+                            return # -------------------------------------------------------------------------------------->
+
+            self.clear_stack()
+            self.stack_put(array)
+            self._message = f"Stack to array: {array}"
 
     def iterable_to_stack(self):
         """ tries to map an iterable object at X to the stack so [1, 2] would map to x = 1 and y = 2.
         If x is not an iterable object it will be duplicated in on the stack """
         # check if X is an iterable object
+        self._update_stack_history()
         try:
             iter(self._stack[0])
         except Exception as ex:
@@ -928,7 +1022,9 @@ class Calculator:
             self._duplicate_x_value_in_y_position()
         else:
             x_hold = self._stack.pop(0)
-            for item in reversed(x_hold):
+            if self._setting_invert_lists is False:
+                x_hold = list(reversed(x_hold))
+            for item in x_hold:
                 self.stack_put(item)
             self._message = f"Iterable to stack: {x_hold}"
 
@@ -938,6 +1034,7 @@ class Calculator:
 
     def clear_stack(self,):
         """ clears the entire stack """
+        self._update_stack_history()
         self._message = 'Clear Stack'
         log(self._message)
         self._stack = []
@@ -974,7 +1071,7 @@ class Calculator:
         """ deletes the last char entry on the stack """
         self._message = None
         log(f"Delete Last Stack Entry Char")
-        if self._last_stack_entry == 'enter':
+        if self._last_stack_operation == 'enter':
             self._stack.pop(0)
 
         else:
@@ -987,11 +1084,12 @@ class Calculator:
                     self._message = f"Error: cannot delete last char from non-string: '{self._stack[0]}'"
                     log(self._message)
 
-        self._last_stack_entry = None
+        self._last_stack_operation = None
 
     def clear_stack_level(self, level=0):
         """ clears the stack level, using pop, indexing the stack starts at 0.
          @param level: the stack level to clear, if level is out of range, the stack is not cleared """
+        self._update_stack_history()
         self._message = None
         log(f"Clear Stack Level: {level}")
         if level < len(self._stack):
@@ -1002,6 +1100,7 @@ class Calculator:
 
     def clear_all_variables(self):
         """ clears all the local variables """
+        self._update_stack_history()
         self._message = None
         log(f"Clear All Variables")
         for key in self._locals.keys():
@@ -1033,6 +1132,11 @@ class Calculator:
         """ returns a set of all the user defined functions """
         return self._user_functions
 
+    def return_all_functions(self) -> dict:
+        """ returns a dict of all functions known to the calculator. This is dynamic and will include
+        all imports and user defined functions """
+        return copy(self._exec_globals)
+
     def return_message(self):
         """ returns the message string """
         return self._message
@@ -1049,6 +1153,7 @@ class Calculator:
     def _constant_press(self, constant):
         """ puts a constant on the stack. This method is bound to the buttons dictionary for 'pi', 'euler', 'phi', etc
         @param constant: the constant to put on the stack"""
+        self._update_stack_history()
         if len(self._stack) == 0:
             self._stack.append(constant)
         else:
@@ -1066,17 +1171,24 @@ class Calculator:
 
     @staticmethod
     def _convert_to_best_numeric(x) -> any:
-        """ trys to convert to an int, if that fails, convert to float, if that fails raises a ValueError
+        """ if X is a string, it will try to convert it to a numeric, if the string is '32' it will return an int if
+        the string is '32.0' it will return a float. If X is an int or float it will return the same type
         @param x: the value to convert to a number
         @return: the number or raises a ValueError """
-        try:
-            val = float(x)
-            if val.is_integer():
-                return int(val)
-            else:
-                return val
-        except Exception as ex:
-            raise ValueError(f"Cannot convert '{x}' to number with error: '{ex}'")
+        if isinstance(x, str):
+            try:
+                val = float(x)
+                if '.' in x:
+                    # this is explicitly a float, like 34.0, it can be cast to an int but the user has added the .0
+                    return val # -------------------------------------------------------------------------------------->
+                else:
+                    return int(val)
+            except Exception as ex:
+                raise ValueError(f"Cannot convert '{x}' to number with error: '{ex}'")
+        elif isinstance(x, (int, float)):
+            return x
+        else:
+            raise ValueError(f"Error: convert to best numeric, unknown type for x: '{x}'")
 
     def add_user_function(self, function_string: str):
         """ adds a user defined function to the calculator object
@@ -1093,5 +1205,10 @@ class Calculator:
             self._message = f"Error: adding user function: '{function_string}' with error: '{ex}'"
             log(self._message)
             raise Exception(self._message)
+
+    def setting_invert_lists(self, invert_lists: bool):
+        """ sets the invert lists flag, if True, when using 'stack to list or stack to array' the stack will be
+        inverted in the list, so stack[0] will be list[-1] if this setting is True"""
+        self._setting_invert_lists = invert_lists
 
 
