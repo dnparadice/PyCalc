@@ -635,7 +635,7 @@ class MainWindow:
         window.title('Add Function')
 
         # create a text entry field
-        entry = tk.Text(window, height=5, width=50)
+        entry = tk.Text(window, height=25, width=50)
         if function_string is None:
             default_text = 'def sqr_x(x):\n    return x**2'
             txt = self._c.return_user_functions().get(self._settings.last_user_function_edit_name, default_text)
@@ -687,7 +687,8 @@ class MainWindow:
         # create a text entry field
         entry = tk.Text(window, height=50, width=75)
         func_dict = self._c.return_all_functions()
-        for key, value in func_dict.items():
+        sorted_dict = dict(sorted(func_dict.items()))
+        for key, value in sorted_dict.items():
             if '__' not in key:
                 try:
                     sig = inspect.signature(value)
