@@ -453,7 +453,7 @@ class Calculator:
 
         # if not a string, then put it on the stack whatever it is and feel the power of dynamic typing
         else:
-            log(f"User Entry: not a string: {user_input}")
+            # log(f"User Entry: not a string: {user_input}")
             self.stack_put(user_input)
 
         # do some housekeeping for the calc object
@@ -1101,6 +1101,18 @@ class Calculator:
     def return_locals(self):
         """ returns the locals dictionary """
         return self._locals
+
+    def delete_local(self, key):
+        """ deletes a local variable by key """
+        self._update_stack_history()
+        self._message = None
+        if key in self._locals:
+            val = self._locals.pop(key)
+            self._exec_globals.pop(key, None)
+            self._message = f"Removed local variable: {key}={val}"
+        else:
+            self._message = f"Error: cant remove local item: '{key}'"
+        log(self._message)
 
     def clear_stack(self,):
         """ clears the entire stack """

@@ -8,6 +8,7 @@ from copy import copy
 from struct import pack
 import pickle
 from enum import Enum
+from platform import system as platform_system
 
 try:
     from logger import Logger
@@ -15,7 +16,13 @@ try:
     log = logger.print_to_console
 except ImportError:
     log = print
-    
+
+
+class OsType(Enum):
+    LINUX = 0
+    MAC = 1
+    WINDOWS = 2
+    OTHER = 3
     
 class UiFrame(tk.Frame):
     """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this 
@@ -94,6 +101,17 @@ class MainWindow:
         """ creates the main window for the calculator
         @param settings: CalculatorUiSettings, the settings for the calculator UI, passing a value besides None here
         overrides the 'load settings on launch' behavior and uses the passed settings """
+
+        # check the OS type, tkinter has different behavior on different OS's
+        sys = platform_system()
+        if sys == 'Linux':
+            self._os_type = OsType.LINUX
+        elif sys == 'Darwin':
+            self._os_type = OsType.MAC
+        elif sys == 'Windows':
+            self._os_type = OsType.WINDOWS
+        else: # includes null, '', and Java
+            self._os_type = OsType.OTHER
 
         self._autosave_path = 'last_state_autosave.pycalc'
         self._c = Calculator()
@@ -376,12 +394,58 @@ class MainWindow:
             # add a graphic line below the locals table
             ttk.Separator(self._frame_locals, orient='horizontal').pack(fill='x')
 
+
+            if self._os_type == OsType.WINDOWS:
+                btn = '<Button-3>'
+            elif self._os_type == OsType.LINUX or self._os_type == OsType.MAC:
+                btn = '<Button-2>'
+            else:
+                log(f"Error setting right click menu for locals table, unknown OS type: {self._os_type}")
+                btn = '<Button-2>'
+
+            # add right click menu to locals table with option "insert value to stack at x"
+            self._locals_table.bind(btn, self._right_click_menu_locals_table)
+
             self._update_locals_display()
 
         else:
             exists = hasattr(self, '_frame_locals')
             if exists:
                 self._frame_locals.destroy()
+
+    def _right_click_menu_locals_table(self, event):
+        """ creates a right click menu for the locals table """
+        # create a right click menu
+        right_click_menu = tk.Menu(self._root, tearoff=0)
+        right_click_menu.add_command(label='Insert value to stack at X', command=self._insert_value_to_stack_at_x)
+        # add a line seperator to the menu
+        right_click_menu.add_separator()
+        # add item: "remove selected item"
+        right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
+        right_click_menu.post(event.x_root, event.y_root)
+
+    def _insert_value_to_stack_at_x(self):
+        """ inserts the value of the selected item in the locals table to the stack at X """
+        selected = self._locals_table.selection()
+        if len(selected) == 0:
+            return
+        key = self._locals_table.item(selected)['text']
+        value = self._locals_table.item(selected)['values'][0]
+        self._c.user_entry(value)
+        self._update_stack_display()
+        self._update_message_display(f"Inserted value at x: {key}={value}")
+
+    def _remove_selected_item_from_locals_table(self):
+        """ removes the selected item from the locals table """
+        selected = self._locals_table.selection()
+        if len(selected) == 0:
+            return
+        key = self._locals_table.item(selected)['text']
+        value = self._locals_table.item(selected)['values'][0]
+        self._c.delete_local(key)
+        self._update_locals_display()
+        self._update_message_display()
+
     def _set_visibility_buttons(self, state: bool):
         """ sets the visibility of the buttons based on the state """
         if state is True:
@@ -1067,7 +1131,7 @@ class MainWindow:
             self._message_field.delete('1.0', 'end')
 
             if direct_message is not None:
-                self._message_field.insert(direct_message)
+                self._message_field.insert('1.0', direct_message)
             else:
                 msg = self._c.return_message()
                 if msg is not None:
