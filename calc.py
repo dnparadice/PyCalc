@@ -433,7 +433,8 @@ class Calculator:
 
             # if not in the function dict, its a string entry
             # if the last stack entry was 'enter' then the user is entering a new string value
-            if self._last_stack_operation == 'enter':
+            shift_vals = {'enter', 'assignment', 'recall'}
+            if self._last_stack_operation in shift_vals:
                 self.stack_put(user_input, shift_up=False)
 
             else:
@@ -687,6 +688,12 @@ class Calculator:
                                 var_key = assignment_list[0].strip()
                                 var_value = assignment_list[1].strip()
 
+                                # if the var_value can be a number, then convert it, else it can be anything else
+                                try:
+                                    var_value = self._convert_to_best_numeric(var_value)
+                                except Exception as ex:
+                                    pass # this is the case that var_value is NOT a number, but that is ok
+
                             # if 'a=' is on the stack @X, and Y is anything (except empty),
                             # then assign Y to the name in X
                             elif len(self._stack) > 0:
@@ -760,21 +767,64 @@ class Calculator:
 
                 # at this point X is like 'sin' or 'cos' so pop the name and call the math function
                 function = self._stack.pop(0) # the math functions expect the argument in X not the name
-                Y = self._stack.pop(0)
+
+                if x_str in self._user_functions:
+                    try:
+                        sig = inspect.signature(eval(function, self._exec_globals))  # like: <Signature (x, y, z=3)>
+
+                        # not sure how to handle the signatures with kwargs in this context since we are pulling
+                        # off the stack. What to do? Should we pull more values off the stack to fill the
+                        # kwargs positionally?
+                        # that sounds like a very bad idea, lets just ignore the kwargs, if the user needs to call with
+                        # kwargs they must enter the entire function like: 'function(x, y, z=3)' into X
+                        sig_str = str(sig)
+                        sig_list = sig_str.split(',')
+                        required_params = [p.replace('(', '') for p in sig_list if '=' not in p]
+                        required_args_count = len(required_params)
+                        if len(self._stack) < required_args_count:
+                            self._message = (f"Error: not enough values on the stack to "
+                                             f"perform the operation: '{function}'")
+                            self.stack_put(function)
+                            return  # -------------------------------------------------------------------------------->
+                        args = [self._stack.pop(0) for arg in range(required_args_count)]
+                        args = tuple(args)
+
+                        result = eval(x_str, self._exec_globals, )(*args)
+                        self._message = f"Evaluated: {x_str}{args} to {result}"
+                        self.stack_put(result)
+                        self._last_stack_operation = 'function'
+                        return  # ----------------------------------------------------------------------------->
+                    except Exception as ex:
+                        pass  # try the next lib
+
+                # Y = self._stack.pop(0)
                 for lib in self._imported_libs:
                     keys = dir(eval(lib))
                     if x_str in keys:
                         try:
                             exc_str = f'{lib}.{x_str}'
-                            result = eval(exc_str, self._exec_globals)(Y)
-                            self._message = f"Evaluated: {exc_str}{Y} to {result}"
+                            sig = inspect.signature(eval(exc_str, self._exec_globals))  # like: <Signature (x, y, z=3)>
+                            sig_str = str(sig)
+                            sig_list = sig_str.split(',')
+                            required_params = [p.replace('(', '') for p in sig_list if '=' not in p]
+                            required_args_count = len(required_params)
+                            if len(self._stack) < required_args_count:
+                                self._message = (f"Error: not enough values on the stack to "
+                                                 f"perform the operation: '{function}'")
+                                self.stack_put(function)
+                                return  # ----------------------------------------------------------------------------->
+                            args = [self._stack.pop(0) for arg in range(required_args_count)]
+                            args = tuple(args)
+                            result = eval(exc_str, self._exec_globals, )(args)
+                            self._message = f"Evaluated: {exc_str}{args} to {result}"
                             self.stack_put(result)
                             self._last_stack_operation = 'function'
-                            return  # ----------------------------------------------------------------------------->
+                            return  # --------------------------------------------------------------------------------->
                         except Exception as ex:
                             pass # try the next lib
                 # no dice, restore the stack
-                self.stack_put(Y)
+                for arg in args:
+                    self.stack_put(arg)
                 self.stack_put(function)
 
             # .........................................
@@ -782,13 +832,15 @@ class Calculator:
             # .........................................
             # if you made it this far with no success, try x=eval(x) and failing that exe(x), this is the last try
             x_temp = self._stack.pop(0)
+
+            # first try eval --------------------------
             try:
                 result = eval(x_temp, self._exec_globals) # this works on input like 'np.arrange(10)'
                 self._message = f"Evaluated: {x_temp} to {result}"
                 result_type = type(result)
                 result_type_str = str(result_type)
 
-                good = {"<class 'type'>", "<class 'builtin_function_or_method'>", "<class 'function'>" }
+                good = {"<class 'type'>", "<class 'builtin_function_or_method'>", "<class 'function'>"}
                 if result_type_str in good:
                     # in this case the user probably wants to apply the builtin functon to Y
                     Y = self._stack.pop(0)
@@ -801,14 +853,25 @@ class Calculator:
 
                 self._last_stack_operation = 'eval'
                 self.stack_put(result)
-            except Exception as ex:
-                try:
-                    exec(x_temp, self._exec_globals)  # this works on input like 'import os' with no return value
-                    self._last_stack_operation = 'exec'
-                    self._message = f"Executed: {x_temp}"
 
-                    # ------- Handle Imports -------
-                    if 'import' in x_temp: # string like 'import os', 'from os import path', or 'import numpy as np'
+            # next try exec --------------------------
+            except Exception as ex:
+
+                if 'import' not in x_temp:
+                    try:
+                        exec(x_temp, self._exec_globals)  # this works on input like 'import os' with no return value
+                        self._last_stack_operation = 'exec'
+                        self._message = f"Executed: {x_temp}"
+                    except Exception as ey:
+                        self._message = f"Error in enter_press: exec: '{x_temp}' with exceptions ex: {ex}: ey: {ey}"
+                        self.stack_put(x_temp)
+                        # todo: set a flag to dup X on enter error, this is a string that cant be parsed ..
+                        # but maybe the user wants to use it as a string
+                        self._last_stack_operation = 'error'
+
+                # ------- Handle Imports -------
+                else: # import is in X, like 'import os', 'from os import path', or 'import numpy as np'
+                    try:
                         # figure out what was imported and track all imported functions and libraries
                         imported_name = None
                         imported_lib = None
@@ -824,22 +887,29 @@ class Calculator:
                                 imported_name = imported_list[3]
 
                         if imported_lib is not None:
-                            self._imported_libs.add(imported_lib)
-                            for item in dir(imported_name):
-                                if not item.startswith('_'):
-                                    self._all_functions.add(item)
+                            exec(f'{x}', self._exec_globals)  # do the actual import
+                            self._message = f"Imported lib: '{imported_lib}'"
+
                         if imported_name is not None:
-                            self._all_functions.add(imported_lib)
+                            if imported_name not in self._exec_globals:
+                                exec(f'{x}', self._exec_globals)  # do the actual import
+                                self._all_functions.add(imported_lib)
+                                self._message = f"Imported name: '{imported_name}'"
+                            else:
+                                self._message = f"Warning: '{imported_name}' already in namespace, did not import."
+                    except Exception as ex:
+                        self._message = f"Error in enter_press: import: '{x_temp}' with exceptions ex: {ex}"
+                        self.stack_put(x_temp)
+                        self._last_stack_operation = 'error'
+
+                    # # print all the imported functions
+                    # print(f'--------------------------------------------------------------')
+                    # print(f"Imported functions count: {len(self._all_functions)}")
+                    # for func in self._all_functions:
+                    #     print(func)
+                    # print(f'--------------------------------------------------------------')
 
 
-
-                except Exception as ey:
-                    self._message = f"Error in enter_press: eval/exec: '{x_temp}' with exceptions ex: {ex}: ey: {ey}"
-                    self.stack_put(x_temp)
-                    # todo: set a flag to dup X on enter error, this is a string that cant be parsed ..
-                    # but maybe the user wants to use it as a string
-                    self.stack_put(x_temp)
-                    self._last_stack_operation = 'enter'
             log(self._message)
 
     def _duplicate_x_value_in_y_position(self):
@@ -1004,7 +1074,7 @@ class Calculator:
                             # restore the stack
                             self._stack = stack_hold
                             log(self._message)
-                            return # -------------------------------------------------------------------------------------->
+                            return # ---------------------------------------------------------------------------------->
 
             self.clear_stack()
             self.stack_put(array)
