@@ -708,13 +708,15 @@ class Calculator:
                                 self._last_stack_operation = 'error'
                                 log(self._message)
                                 return # ------------------------------------------------------------------------------>
-                            self._locals.update({var_key: var_value})
+
+                            best_numeric = self._convert_to_best_numeric(var_value)
+                            self._locals.update({var_key: best_numeric})
                             # exec adds a __builtins__ to the locals so keep a clean copy of locals and an _exec_globals
                             # for passing to exec, if you want you can modify globals here
                             for key, value in self._locals.items():
                                 self._exec_globals.update({key: value})
-                            self.stack_put(var_value)
-                            self._message = f"Assignment: {var_key} = {var_value}"
+                            self.stack_put(best_numeric)
+                            self._message = f"Assignment: {var_key} = {best_numeric}"
                             self._last_stack_operation = 'assignment'
                             log(self._message)
                             return  # --------------------------------------------------------------------------------->
