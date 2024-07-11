@@ -143,7 +143,7 @@ class Calculator:
                                     'enter': lambda: self.enter_press(),
                                     'clear': lambda: self.clear_stack_level(),
                                     'delete': lambda: self.delete_last_char(),
-                                    'undo': lambda: self.undo_last_action(),
+                                    'undo': lambda: self.undo_last_action(pop_last_history=True),
 
                                     # wrappers for the math library that expose more natural language functions like ln
                                     'ln': lambda: self.natural_log(),
@@ -174,12 +174,22 @@ class Calculator:
         self.user_entry('import matplotlib.pyplot as plt')
         self.user_entry('enter')
 
-    def undo_last_action(self):
-        """ undoes the last action by restoring the stack to the previous state """
+    def undo_last_action(self, pop_last_history=False):
+        """ undoes the last action by restoring the stack to the previous state
+        @param pop_last_history: if True, the last history entry is popped off the history stack. This is used in the
+                                 case that you type 'undo' and then press enter. because the enter press will
+                                 always add an item to the undo history, you need to pop it off so you dont get stuck
+                                not being able to actually undo anything
+        """
         self._message = None
+        if pop_last_history:
+            _removed_A = self._stack_history.pop(-1)  # removes the 'undo'
+            _removed_B = self._stack_history.pop(-1)  # removes the 'enter'
         if len(self._stack_history) > 0:
             self._stack = self._stack_history.pop(-1)
             self._message = f"Undo: restored stack to previous state. History Length: '{len(self._stack_history)}'"
+            log(self._message)
+            log(f"STACK: {self._stack}")
         else:
             self._message = f"Error: no history to undo"
             log(self._message)
@@ -1210,8 +1220,8 @@ class Calculator:
         keys = list(self._button_functions.keys())
         return keys
 
-    def return_user_functions(self):
-        """ returns a set of all the user defined functions """
+    def return_user_functions(self) -> dict:
+        """ returns a dict of all the user defined functions """
         return self._user_functions
 
     def return_all_functions(self) -> dict:
