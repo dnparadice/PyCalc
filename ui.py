@@ -2,13 +2,13 @@ import inspect
 import tkinter as tk
 import tkinter.filedialog as filedialog
 from tkinter import ttk
-from tkinter.ttk import Style
 from calc import Calculator
 from copy import copy
-from struct import pack
 import pickle
 from enum import Enum
 from platform import system as platform_system
+import platform
+from enum import Enum
 
 try:
     from logger import Logger
@@ -26,23 +26,23 @@ class OsType(Enum):
 
 
 class UiFrame(tk.Frame):
-    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this 
+    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this
     context
-    
+
     Warning, the coverage for self.visible is not complete, it is only set in the pack, pack_forget, and destroy methods
     """
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.visible = None  # set to True or False to indicate if the widget is visible or not
-        
+
     def pack_forget(self):
         super().pack_forget()
         self.visible = False
-        
+
     def destroy(self):
         super().destroy()
         self.visible = False
-        
+
     def pack(self, **kwargs):
         super().pack(**kwargs)
         self.visible = True
@@ -94,6 +94,13 @@ class CalculatorUiState:
         self.locals = dict()
         self.settings = CalculatorUiSettings()
         self.functions = dict()
+
+
+class OsType(Enum):
+    WINDOWS = 1
+    MAC = 2
+    LINUX = 3
+    UNKNOWN = 4
 
 
 class MainWindow:
@@ -519,6 +526,21 @@ class MainWindow:
             # create a frame for the math buttons
             self._numeric_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
             numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
+        # ttk buttons ane not the same across OS, need to adjust the width of the buttons
+        if self._os_type == OsType.WINDOWS:
+            button_width_mod = 5
+        elif self._os_type == OsType.LINUX:
+            button_width_mod = 2
+        elif self._os_type == OsType.MAC:
+            button_width_mod = 0 # the original was written on a MAC so the mods are for Windows and Linux
+        else:
+            button_width_mod = 0
+
+        # create a frame for the math buttons
+        self._numeric_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
+        self._numeric_buttons.pack()
+
+        numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
 
             # arrange the buttons on a grid in a standard calculator layout
             for i, button in enumerate(numbers):
