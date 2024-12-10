@@ -6,8 +6,7 @@ from calc import Calculator
 from copy import copy
 import pickle
 from enum import Enum
-import platform
-from enum import Enum
+from platform import system as platform_system
 
 try:
     from logger import Logger
@@ -15,6 +14,13 @@ try:
     log = logger.print_to_console
 except ImportError:
     log = print
+
+
+class OsType(Enum):
+    LINUX = 0
+    MAC = 1
+    WINDOWS = 2
+    OTHER = 3
 
 
 class UiFrame(tk.Frame):
@@ -59,17 +65,17 @@ class CalculatorUiSettings:
         self.stack_rows = 2
         self.locals_rows = 10
 
-        self.locals_width_key = 10
-        self.locals_width_value = 260
+        self.locals_width_key = 100
+        self.locals_width_value = 160
 
         self.stack_index_width = 20
         self.stack_value_width = 200
         self.stack_type_width = 50
-        self.message_width = 57
+        self.message_width = 45
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
-        self.stack_font = ('Arial', 12)
+        self.stack_font = ('Arial', 24)
         self.locals_font = ('Arial', 12)
         self.message_font = ('Arial', 12)
         self.button_font = ('Arial', 12)
@@ -102,24 +108,16 @@ class MainWindow:
         @param settings: CalculatorUiSettings, the settings for the calculator UI, passing a value besides None here
         overrides the 'load settings on launch' behavior and uses the passed settings """
 
-        # determine if the system is win, max, or linux because tkinter.ttk needs some help with consistent styling
-        # and text size between OS flavors
-        # get os name with the os module
-        import os
-        os_name = platform.system() # returns  'Windows', 'Darwin', 'Linux' or 'Java' ??? (apparently for android)
-        if os_name == 'Windows':
-            self._os_type = OsType.WINDOWS
-
-        elif os_name == 'Darwin':
-            self._os_type = OsType.MAC
-
-        elif os_name == 'Linux':
+        # check the OS type, tkinter has different behavior on different OS's
+        sys = platform_system()
+        if sys == 'Linux':
             self._os_type = OsType.LINUX
-
-        else:
-            self._os_type = OsType.UNKNOWN
-
-
+        elif sys == 'Darwin':
+            self._os_type = OsType.MAC
+        elif sys == 'Windows':
+            self._os_type = OsType.WINDOWS
+        else: # includes null, '', and Java
+            self._os_type = OsType.OTHER
 
         self._autosave_path = 'last_state_autosave.pycalc'
         self._c = Calculator()
@@ -253,6 +251,11 @@ class MainWindow:
         # add an option to 'clear all user functions' that calls the method clear_all_user_functions
         self._options_menu.add_command(label='Clear all functions', command=self.popup_confirm_clear_all_user_functions)
 
+        self._options_menu.add_separator()
+
+        # add option to open the 'function buttons' popup
+        self._options_menu.add_command(label='Function buttons', command=self.popup_function_buttons)
+
         # MENU BINDINGS ........................
 
         # <none>
@@ -327,7 +330,7 @@ class MainWindow:
             self._frame_stack.pack(fill='x', expand=True)  # fill='x', expand=True
 
             # add a table with 10 rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
-            self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type',))
+            self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type', ))
             self._stack_table.heading('#0', text='Index')
             self._stack_table.heading('value', text='Value')
             self._stack_table.heading('type', text='Type')
@@ -340,17 +343,20 @@ class MainWindow:
         if number_visible_rows is not None:
             self._settings.stack_rows = number_visible_rows
         self._stack_table['height'] = self._settings.stack_rows
-        self._stack_table.column('#0', width=self._settings.stack_index_width)
-        self._stack_table.column('value', width=self._settings.stack_value_width)
-        self._stack_table.column('type', width=self._settings.stack_type_width)
+        self._stack_table.column('#0', width=self._settings.stack_index_width, anchor='w',)
+        self._stack_table.column('value', width=self._settings.stack_value_width, anchor='e')
+        self._stack_table.column('type', width=self._settings.stack_type_width, anchor=tk.CENTER)
 
         self._update_stack_display()
+
+        log(f"Stack Table column width: {self._stack_table.column('value', 'width')}")
+
+    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
 
     def _update_visible_ui_object_message_field(self):
         log(f'error deprecated - message field')
 
 
-    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
 
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
@@ -402,12 +408,100 @@ class MainWindow:
             # add a graphic line below the locals table
             ttk.Separator(self._frame_locals, orient='horizontal').pack(fill='x')
 
+
+            if self._os_type == OsType.WINDOWS:
+                btn = '<Button-3>'
+            elif self._os_type == OsType.LINUX or self._os_type == OsType.MAC:
+                btn = '<Button-2>'
+            else:
+                log(f"Error setting right click menu for locals table, unknown OS type: {self._os_type}")
+                btn = '<Button-2>'
+
+            # add right click menu to locals table with option "insert value to stack at x"
+            self._locals_table.bind(btn, self._right_click_menu_locals_table)
+
             self._update_locals_display()
 
         else:
             exists = hasattr(self, '_frame_locals')
             if exists:
                 self._frame_locals.destroy()
+
+    def _right_click_menu_locals_table(self, event):
+        """ creates a right click menu for the locals table """
+        # create a right click menu
+        right_click_menu = tk.Menu(self._root, tearoff=0)
+        right_click_menu.add_command(label='Insert value to stack at X', command=self._insert_value_to_stack_at_x)
+        right_click_menu.add_command(label='Edit value', command=self._edit_variable_value)
+
+        # add a line seperator to the menu
+        right_click_menu.add_separator()
+        # add item: "remove selected item"
+        right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
+        right_click_menu.post(event.x_root, event.y_root)
+
+    def _insert_value_to_stack_at_x(self):
+        """ inserts the value of the selected item in the locals table to the stack at X """
+        selected = self._locals_table.selection()
+        if len(selected) == 0:
+            return
+        key = self._locals_table.item(selected)['text']
+        value = self._locals_table.item(selected)['values'][0]
+        self._c.user_entry(value)
+        self._update_stack_display()
+        self._update_message_display(f"Inserted value at x: {key}={value}")
+
+    def _edit_variable_value(self):
+        """ opens a popup window to edit the value of the selected item in the locals table """
+        selected = self._locals_table.selection()
+        if len(selected) == 0:
+            return
+        key = self._locals_table.item(selected)['text']
+        value = self._locals_table.item(selected)['values'][0]
+        self.popup_edit_variable_value(key, value)
+
+    def popup_edit_variable_value(self, key, value):
+        """ opens a popup window to edit the value of the selected item in the locals table """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Edit Variable Value')
+
+        # create a label to ask the user to edit the value
+        label = ttk.Label(window, text=f'Edit the value for: {key}')
+        label.pack()
+
+        # create a text entry field
+        entry = ttk.Entry(window)
+        entry.insert(0, value)
+        entry.pack()
+
+        def apply_value():
+            new_value = entry.get()
+            self._c.user_entry(f"{key}={new_value}")
+            self._c.enter_press()
+            self._update_message_display()
+            self._update_locals_display()
+            self._update_stack_display()
+
+            window.destroy()
+
+        # create a button to save the changes
+        ttk.Button(window, text='OK', command=apply_value).pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+    def _remove_selected_item_from_locals_table(self):
+        """ removes the selected item from the locals table """
+        selected = self._locals_table.selection()
+        if len(selected) == 0:
+            return
+        key = self._locals_table.item(selected)['text']
+        value = self._locals_table.item(selected)['values'][0]
+        self._c.delete_local(key)
+        self._update_locals_display()
+        self._update_message_display()
+
     def _set_visibility_buttons(self, state: bool):
         """ sets the visibility of the buttons based on the state """
         if state is True:
@@ -753,6 +847,38 @@ class MainWindow:
         # create a button to cancel the changes
         ttk.Button(window, text='Close', command=window.destroy).pack()
 
+    def popup_function_buttons(self):
+        """ opens a popup window to show the all user functions available to the calculator """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Function Buttons')
+
+        # create a frame for the function buttons
+        frame = UiFrame(window, background=self._background_color, padx=5, pady=5)
+        frame.pack()
+
+        # create a button for each function
+        func_dict = self._c.return_user_functions()
+        sorted_dict = dict(sorted(func_dict.items()))
+        for key, value in sorted_dict.items():
+            if '__' not in key:
+                ttk.Button(frame,
+                           text=f"{key}",
+                           command=lambda btn=key: self._popup_function_button_press(btn),
+                           ).pack(fill='x')
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Close', command=window.destroy).pack()
+
+    def _popup_function_button_press(self, function: str):
+        """ this method gets bound to the function buttons in the popup window """
+        self._c.enter_press()
+        self._c.user_entry(function)
+        self._c.enter_press()
+        self._update_stack_display()
+        self._update_message_display()
+        self._update_locals_display()
+
     def _load_settings_on_launch(self):
         """ looks for the settings file 'last_state_autosave' in the local directory and loads it if the user has
          selected to save state on exit """
@@ -926,8 +1052,18 @@ class MainWindow:
         calc_state = CalculatorUiState()
         calc_state.stack = self._c.return_stack_for_display()
         calc_state.locals = self._c.return_locals()
-        calc_state.settings = copy(self._settings)
         calc_state.functions = self._c.return_user_functions()
+        calc_state.settings = copy(self._settings)
+
+        calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
+        calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
+        calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
+
+        calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
+        calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
+
+        calc_state.settings.message_width = 45
+
         pkl_dump = pickle.dumps(calc_state)
         file.write(pkl_dump)
         file.close()
@@ -1108,7 +1244,7 @@ class MainWindow:
             self._message_field.delete('1.0', 'end')
 
             if direct_message is not None:
-                self._message_field.insert(direct_message)
+                self._message_field.insert('1.0', direct_message)
             else:
                 msg = self._c.return_message()
                 if msg is not None:
@@ -1129,6 +1265,7 @@ class MainWindow:
                                              text=key,
                                              value=(formatted_value,),
                                          )
+
     def launch_ui(self):
         """ launches the main window by calling the Tk mainloop method """
         self._root.mainloop()
