@@ -67,17 +67,17 @@ class CalculatorUiSettings:
         self.stack_rows = 2
         self.locals_rows = 10
 
-        self.locals_width_key = 10
-        self.locals_width_value = 260
+        self.locals_width_key = 100
+        self.locals_width_value = 160
 
         self.stack_index_width = 20
         self.stack_value_width = 200
         self.stack_type_width = 50
-        self.message_width = 57
+        self.message_width = 45
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
-        self.stack_font = ('Arial', 12)
+        self.stack_font = ('Arial', 24)
         self.locals_font = ('Arial', 12)
         self.message_font = ('Arial', 12)
         self.button_font = ('Arial', 12)
@@ -338,16 +338,20 @@ class MainWindow:
         if number_visible_rows is not None:
             self._settings.stack_rows = number_visible_rows
         self._stack_table['height'] = self._settings.stack_rows
-        self._stack_table.column('#0', width=self._settings.stack_index_width, anchor='w')
+        self._stack_table.column('#0', width=self._settings.stack_index_width, anchor='w',)
         self._stack_table.column('value', width=self._settings.stack_value_width, anchor='e')
         self._stack_table.column('type', width=self._settings.stack_type_width, anchor=tk.CENTER)
 
         self._update_stack_display()
 
+        log(f"Stack Table column width: {self._stack_table.column('value', 'width')}")
+
+    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
+
     def _update_visible_ui_object_message_field(self):
         log(f'error deprecated - message field')
 
-    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
+
 
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
@@ -1028,8 +1032,18 @@ class MainWindow:
         calc_state = CalculatorUiState()
         calc_state.stack = self._c.return_stack_for_display()
         calc_state.locals = self._c.return_locals()
-        calc_state.settings = copy(self._settings)
         calc_state.functions = self._c.return_user_functions()
+        calc_state.settings = copy(self._settings)
+
+        calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
+        calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
+        calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
+
+        calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
+        calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
+
+        calc_state.settings.message_width = 45
+
         pkl_dump = pickle.dumps(calc_state)
         file.write(pkl_dump)
         file.close()
