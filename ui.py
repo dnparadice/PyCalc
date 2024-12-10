@@ -71,7 +71,7 @@ class CalculatorUiSettings:
         self.stack_index_width = 20
         self.stack_value_width = 200
         self.stack_type_width = 50
-        self.message_width = 45
+        self.message_width = 30
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
@@ -504,6 +504,17 @@ class MainWindow:
 
     def _set_visibility_buttons(self, state: bool):
         """ sets the visibility of the buttons based on the state """
+
+        # ttk buttons ane not the same across OS, need to adjust the width of the buttons
+        if self._os_type == OsType.WINDOWS:
+            button_width_mod = 4
+        elif self._os_type == OsType.LINUX:
+            button_width_mod = 2
+        elif self._os_type == OsType.MAC:
+            button_width_mod = 0  # the original was written on a MAC so the mods are for Windows and Linux
+        else:
+            button_width_mod = 0
+
         if state is True:
             self._settings.show_buttons = True
             self._tk_var_menu_view_show_buttons.set(True)
@@ -528,35 +539,29 @@ class MainWindow:
             # create a frame for the math buttons
             self._numeric_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
             numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
-        # ttk buttons ane not the same across OS, need to adjust the width of the buttons
-        if self._os_type == OsType.WINDOWS:
-            button_width_mod = 5
-        elif self._os_type == OsType.LINUX:
-            button_width_mod = 2
-        elif self._os_type == OsType.MAC:
-            button_width_mod = 0 # the original was written on a MAC so the mods are for Windows and Linux
-        else:
-            button_width_mod = 0
 
-        # create a frame for the math buttons
-        self._numeric_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
-        self._numeric_buttons.pack()
+            # create a frame for the math buttons
+            self._numeric_buttons = tk.Frame(self._right_frame, background=self._background_color, padx=5, pady=5)
+            self._numeric_buttons.pack()
 
-        numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
+            numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
 
             # arrange the buttons on a grid in a standard calculator layout
             for i, button in enumerate(numbers):
                 ttk.Button(self._numeric_buttons,
                            text=button,
                            command=lambda btn=button: self.button_press(btn),
-                           width=2,
+                           width=2+button_width_mod,
                            ).grid(row=i // 3, column=i % 3, )
 
             self._numeric_buttons.pack()
+
         else:
             exists = hasattr(self, '_numeric_buttons')
             if exists:
                 self._numeric_buttons.destroy()
+
+
 
         # Calculation Buttons ---------------------------
 
@@ -571,13 +576,13 @@ class MainWindow:
                 ttk.Button(self._calc_buttons,
                            text=button,
                            command=lambda btn=button: self.button_press(btn),
-                           width=5,
+                           width=5+button_width_mod,
                            ).grid(row=i, column=0)
             for i, button in enumerate(calc_buttons):
                 ttk.Button(self._calc_buttons,
                            text=button,
                            command=lambda btn=button: self.button_press(btn),
-                           width=5,
+                           width=5+button_width_mod,
                            ).grid(row=i, column=1)
             self._calc_buttons.pack()
         else:
@@ -599,7 +604,7 @@ class MainWindow:
             for i, name, button in zip(indexs, names, buttons):
                 ttk.Button(self._operation_buttons,
                            text=name,
-                           width=3,
+                           width=3+button_width_mod,
                            command=lambda btn=button: self.button_press(btn),
                            ).grid(row=i // 2, column=i % 2)
 
@@ -1062,7 +1067,8 @@ class MainWindow:
         calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
         calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
 
-        calc_state.settings.message_width = 45
+        #todo: need to figure out how to get the width to save it.
+        calc_state.settings.message_width = 30
 
         pkl_dump = pickle.dumps(calc_state)
         file.write(pkl_dump)
