@@ -114,9 +114,9 @@ class Calculator:
                                     '/': lambda: self.stack_operation('/'),
                                     '**': lambda: self.stack_operation('**'),
                                     '!': lambda: self.stack_function_press('factorial'),
-                                    'x^2': lambda : self.raise_pow_2(),
-                                    'x^y': lambda : self.raise_pow_x(),
-
+                                    'x^2': lambda: self.raise_pow_2(),
+                                    'x^y': lambda: self.raise_pow_x(),
+                                    'e^x': lambda: self.raise_pow_e(),
 
                                     # constants
                                     'pi': lambda: self._constant_press('3.14159265'),
