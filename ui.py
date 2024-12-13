@@ -342,6 +342,17 @@ class MainWindow:
         self._stack_table.column('value', width=self._settings.stack_value_width, anchor='e')
         self._stack_table.column('type', width=self._settings.stack_type_width, anchor=tk.CENTER)
 
+        if self._os_type == OsType.WINDOWS:
+            btn = '<Button-3>'
+        elif self._os_type == OsType.LINUX or self._os_type == OsType.MAC:
+            btn = '<Button-2>'
+        else:
+            log(f"Error setting right click menu for locals table, unknown OS type: {self._os_type}")
+            btn = '<Button-2>'
+
+        # add right click menu to stack
+        self._stack_table.bind(btn, self._right_click_menu_stack_table)
+
         self._update_stack_display()
 
         log(f"Stack Table column width: {self._stack_table.column('value', 'width')}")
@@ -350,8 +361,6 @@ class MainWindow:
 
     def _update_visible_ui_object_message_field(self):
         log(f'error deprecated - message field')
-
-
 
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
@@ -412,7 +421,7 @@ class MainWindow:
                 log(f"Error setting right click menu for locals table, unknown OS type: {self._os_type}")
                 btn = '<Button-2>'
 
-            # add right click menu to locals table with option "insert value to stack at x"
+            # add right click menu to locals
             self._locals_table.bind(btn, self._right_click_menu_locals_table)
 
             self._update_locals_display()
@@ -433,6 +442,18 @@ class MainWindow:
         right_click_menu.add_separator()
         # add item: "remove selected item"
         right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
+        right_click_menu.post(event.x_root, event.y_root)
+
+    def _right_click_menu_stack_table(self, event):
+        """ creates a right click menu for the stack table """
+        # create a right click menu
+        right_click_menu = tk.Menu(self._root, tearoff=0)
+        right_click_menu.add_command(label='Edit value', command=self._edit_stack_value)
+
+        # # add a line seperator to the menu
+        # right_click_menu.add_separator()
+        # # add item: "remove selected item"
+        # right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
         right_click_menu.post(event.x_root, event.y_root)
 
     def _insert_value_to_stack_at_x(self):
@@ -496,6 +517,51 @@ class MainWindow:
         self._c.delete_local(key)
         self._update_locals_display()
         self._update_message_display()
+
+    def _edit_stack_value(self):
+        """ opens a popup window to edit the value of the selected item in the stack table """
+        selected = self._stack_table.selection()
+        if len(selected) == 0:
+            return
+        key = self._stack_table.item(selected)['text']
+        value = self._stack_table.item(selected)['values'][0]
+        self.popup_edit_stack_value(key, value)
+
+    def popup_edit_stack_value(self, key, value):
+        """ opens a popup window to edit the value of the selected item in the stack table """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Edit Stack Value')
+
+        # create a label to ask the user to edit the value
+        label = ttk.Label(window, text=f'Edit the value for: {key}')
+        label.pack()
+
+        # create a text entry field
+        entry = ttk.Entry(window)
+        entry.insert(0, value)
+        entry.pack()
+
+        def apply_value():
+            new_value = entry.get()
+            # self._c.user_entry(f"{key}={new_value}")
+            self._c.clear_stack_level()
+            self._c.user_entry(new_value)
+            # self._c.enter_press()
+            self._update_message_display()
+            self._update_locals_display()
+            self._update_stack_display()
+
+            window.destroy()
+
+        # bind an enter keypress ro the apply value method
+        entry.bind('<Return>', lambda event: apply_value())
+
+        # create a button to save the changes
+        ttk.Button(window, text='OK', command=apply_value).pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
 
     def _set_visibility_buttons(self, state: bool):
         """ sets the visibility of the buttons based on the state """
