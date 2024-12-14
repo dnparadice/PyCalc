@@ -26,7 +26,7 @@ class OsType(Enum):
 
 
 class UiFrame(tk.Frame):
-    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this 
+    """ extends the TkFrame class to add a no nonsense flag for indicating if the widget is visible or not in this
     context
     
     Warning, the coverage for self.visible is not complete, it is only set in the pack, pack_forget, and destroy methods
@@ -56,7 +56,12 @@ class UiVisibleState(Enum):
 
 class CalculatorUiSettings:
     def __init__(self):
-        """ the default settings for the calculator """
+        """ the default settings for the calculator
+
+        Note: changing the default settings here will only change the settings at launch if there is no
+            last_state_autosave.pycalc file found. To force the settings to change on launch, delete the
+            last_state_autosave.pycalc file before launching the calculator.
+        """
         self.save_state_on_exit = True
         self.float_format_string = '0.6f'
         self.integer_format_string = ','
@@ -450,10 +455,10 @@ class MainWindow:
         right_click_menu = tk.Menu(self._root, tearoff=0)
         right_click_menu.add_command(label='Edit value', command=self._edit_stack_value)
 
-        # # add a line seperator to the menu
-        # right_click_menu.add_separator()
-        # # add item: "remove selected item"
-        # right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
+        # add a line seperator to the menu
+        right_click_menu.add_separator()
+        # add item: "remove selected item"
+        right_click_menu.add_command(label='Clear Stack', command=self.clear_stack)
         right_click_menu.post(event.x_root, event.y_root)
 
     def _insert_value_to_stack_at_x(self):

@@ -423,9 +423,9 @@ class Calculator:
         # most common input is a string
         if isinstance(user_input, str):
             # check if the user is entering a button function
-            if user_input in self._button_functions and user_input != 'e': # watch out for Euler
-                self._button_functions[user_input]()
-                return  # --------------------------------------------------------------------------------------------->
+            # if user_input in self._button_functions and user_input != 'e': # watch out for Euler
+            #     self._button_functions[user_input]()
+            #     return  # --------------------------------------------------------------------------------------------->
 
             # check X for '(' to see if user is entering a function like (1+1)
             if len(self._stack) > 0:
@@ -436,10 +436,10 @@ class Calculator:
             for token in tokens:
                 if token in str(x_ref):
                     break
-            # else:
-                # if user_input in self._button_functions:
-                #     self._button_functions[user_input]()
-                #     return # ---------------------------------------------------------------------------------------->
+            else:
+                if user_input in self._button_functions and user_input != 'e': # watch out for Euler:
+                    self._button_functions[user_input]()
+                    return # ---------------------------------------------------------------------------------------->
 
             # if not in the function dict, its a string entry
             # if the last stack entry was 'enter' then the user is entering a new string value
@@ -943,11 +943,11 @@ class Calculator:
          """
         self._update_stack_history()
         self._message = None
+        error = None
 
         if len(self._stack) > 1:
             x_hold = self._stack.pop(0)
             y_hold = self._stack.pop(0)
-            error = None
 
             try:
                 x = x_hold
