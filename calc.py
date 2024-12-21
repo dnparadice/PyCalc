@@ -1270,7 +1270,7 @@ class Calculator:
         if isinstance(x, str):
             try:
                 val = float(x)
-                if '.' in x:
+                if '.' in str(val):
                     # this is explicitly a float, like 34.0, it can be cast to an int but the user has added the .0
                     return val # -------------------------------------------------------------------------------------->
                 else:
