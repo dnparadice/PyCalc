@@ -26,23 +26,23 @@ class OsType(Enum):
 
 
 class UiFrame(tk.Frame):
-    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this 
+    """ extends the TkFrame class to add a no nonsense flag for indicating if the widget is visible or not in this
     context
-    
+
     Warning, the coverage for self.visible is not complete, it is only set in the pack, pack_forget, and destroy methods
     """
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.visible = None  # set to True or False to indicate if the widget is visible or not
-        
+
     def pack_forget(self):
         super().pack_forget()
         self.visible = False
-        
+
     def destroy(self):
         super().destroy()
         self.visible = False
-        
+
     def pack(self, **kwargs):
         super().pack(**kwargs)
         self.visible = True
@@ -56,7 +56,12 @@ class UiVisibleState(Enum):
 
 class CalculatorUiSettings:
     def __init__(self):
-        """ the default settings for the calculator """
+        """ the default settings for the calculator
+
+        Note: changing the default settings here will only change the settings at launch if there is no
+            last_state_autosave.pycalc file found. To force the settings to change on launch, delete the
+            last_state_autosave.pycalc file before launching the calculator.
+        """
         self.save_state_on_exit = True
         self.float_format_string = '0.6f'
         self.integer_format_string = ','
@@ -67,17 +72,17 @@ class CalculatorUiSettings:
         self.stack_rows = 2
         self.locals_rows = 10
 
-        self.locals_width_key = 10
-        self.locals_width_value = 260
+        self.locals_width_key = 100
+        self.locals_width_value = 160
 
         self.stack_index_width = 20
         self.stack_value_width = 200
         self.stack_type_width = 50
-        self.message_width = 57
+        self.message_width = 30
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
-        self.stack_font = ('Arial', 12)
+        self.stack_font = ('Arial', 24)
         self.locals_font = ('Arial', 12)
         self.message_font = ('Arial', 12)
         self.button_font = ('Arial', 12)
@@ -338,16 +343,31 @@ class MainWindow:
         if number_visible_rows is not None:
             self._settings.stack_rows = number_visible_rows
         self._stack_table['height'] = self._settings.stack_rows
-        self._stack_table.column('#0', width=self._settings.stack_index_width, anchor='w')
+        self._stack_table.column('#0', width=self._settings.stack_index_width, anchor='w',)
         self._stack_table.column('value', width=self._settings.stack_value_width, anchor='e')
         self._stack_table.column('type', width=self._settings.stack_type_width, anchor=tk.CENTER)
 
+        if self._os_type == OsType.WINDOWS:
+            btn = '<Button-3>'
+        elif self._os_type == OsType.LINUX or self._os_type == OsType.MAC:
+            btn = '<Button-2>'
+        else:
+            log(f"Error setting right click menu for locals table, unknown OS type: {self._os_type}")
+            btn = '<Button-2>'
+
+        # add right click menu to stack
+        self._stack_table.bind(btn, self._right_click_menu_stack_table)
+
         self._update_stack_display()
+
+        log(f"Stack Table column width: {self._stack_table.column('value', 'width')}")
+
+    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
 
     def _update_visible_ui_object_message_field(self):
         log(f'error deprecated - message field')
 
-    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
+
 
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
@@ -408,7 +428,7 @@ class MainWindow:
                 log(f"Error setting right click menu for locals table, unknown OS type: {self._os_type}")
                 btn = '<Button-2>'
 
-            # add right click menu to locals table with option "insert value to stack at x"
+            # add right click menu to locals
             self._locals_table.bind(btn, self._right_click_menu_locals_table)
 
             self._update_locals_display()
@@ -429,6 +449,18 @@ class MainWindow:
         right_click_menu.add_separator()
         # add item: "remove selected item"
         right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
+        right_click_menu.post(event.x_root, event.y_root)
+
+    def _right_click_menu_stack_table(self, event):
+        """ creates a right click menu for the stack table """
+        # create a right click menu
+        right_click_menu = tk.Menu(self._root, tearoff=0)
+        right_click_menu.add_command(label='Edit value', command=self._edit_stack_value)
+
+        # add a line seperator to the menu
+        right_click_menu.add_separator()
+        # add item: "remove selected item"
+        right_click_menu.add_command(label='Clear Stack', command=self.clear_stack)
         right_click_menu.post(event.x_root, event.y_root)
 
     def _insert_value_to_stack_at_x(self):
@@ -493,8 +525,64 @@ class MainWindow:
         self._update_locals_display()
         self._update_message_display()
 
+    def _edit_stack_value(self):
+        """ opens a popup window to edit the value of the selected item in the stack table """
+        selected = self._stack_table.selection()
+        if len(selected) == 0:
+            return
+        key = self._stack_table.item(selected)['text']
+        value = self._stack_table.item(selected)['values'][0]
+        self.popup_edit_stack_value(key, value)
+
+    def popup_edit_stack_value(self, key, value):
+        """ opens a popup window to edit the value of the selected item in the stack table """
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Edit Stack Value')
+
+        # create a label to ask the user to edit the value
+        label = ttk.Label(window, text=f'Edit the value for: {key}')
+        label.pack()
+
+        # create a text entry field
+        entry = ttk.Entry(window)
+        entry.insert(0, value)
+        entry.pack()
+
+        def apply_value():
+            new_value = entry.get()
+            # self._c.user_entry(f"{key}={new_value}")
+            self._c.clear_stack_level()
+            self._c.user_entry(new_value)
+            # self._c.enter_press()
+            self._update_message_display()
+            self._update_locals_display()
+            self._update_stack_display()
+
+            window.destroy()
+
+        # bind an enter keypress ro the apply value method
+        entry.bind('<Return>', lambda event: apply_value())
+
+        # create a button to save the changes
+        ttk.Button(window, text='OK', command=apply_value).pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
     def _set_visibility_buttons(self, state: bool):
         """ sets the visibility of the buttons based on the state """
+
+        # ttk buttons ane not the same across OS, need to adjust the width of the buttons
+        if self._os_type == OsType.WINDOWS:
+            button_width_mod = 4
+        elif self._os_type == OsType.LINUX:
+            button_width_mod = 2
+        elif self._os_type == OsType.MAC:
+            button_width_mod = 0  # the original was written on a MAC so the mods are for Windows and Linux
+        else:
+            button_width_mod = 0
+
         if state is True:
             self._settings.show_buttons = True
             self._tk_var_menu_view_show_buttons.set(True)
@@ -540,6 +628,7 @@ class MainWindow:
                            ).grid(row=i // 3, column=i % 3, )
 
             self._numeric_buttons.pack()
+
         else:
             exists = hasattr(self, '_numeric_buttons')
             if exists:
@@ -1039,8 +1128,19 @@ class MainWindow:
         calc_state = CalculatorUiState()
         calc_state.stack = self._c.return_stack_for_display()
         calc_state.locals = self._c.return_locals()
-        calc_state.settings = copy(self._settings)
         calc_state.functions = self._c.return_user_functions()
+        calc_state.settings = copy(self._settings)
+
+        calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
+        calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
+        calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
+
+        calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
+        calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
+
+        #todo: need to figure out how to get the width to save it.
+        calc_state.settings.message_width = 30
+
         pkl_dump = pickle.dumps(calc_state)
         file.write(pkl_dump)
         file.close()

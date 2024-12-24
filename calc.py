@@ -114,9 +114,9 @@ class Calculator:
                                     '/': lambda: self.stack_operation('/'),
                                     '**': lambda: self.stack_operation('**'),
                                     '!': lambda: self.stack_function_press('factorial'),
-                                    'x^2': lambda : self.raise_pow_2(),
-                                    'x^y': lambda : self.raise_pow_x(),
-
+                                    'x^2': lambda: self.raise_pow_2(),
+                                    'x^y': lambda: self.raise_pow_x(),
+                                    'e^x': lambda: self.raise_pow_e(),
 
                                     # constants
                                     'pi': lambda: self._constant_press('3.14159265'),
@@ -423,9 +423,9 @@ class Calculator:
         # most common input is a string
         if isinstance(user_input, str):
             # check if the user is entering a button function
-            if user_input in self._button_functions and user_input != 'e': # watch out for Euler
-                self._button_functions[user_input]()
-                return  # --------------------------------------------------------------------------------------------->
+            # if user_input in self._button_functions and user_input != 'e': # watch out for Euler
+            #     self._button_functions[user_input]()
+            #     return  # --------------------------------------------------------------------------------------------->
 
             # check X for '(' to see if user is entering a function like (1+1)
             if len(self._stack) > 0:
@@ -436,10 +436,10 @@ class Calculator:
             for token in tokens:
                 if token in str(x_ref):
                     break
-            # else:
-                # if user_input in self._button_functions:
-                #     self._button_functions[user_input]()
-                #     return # ---------------------------------------------------------------------------------------->
+            else:
+                if user_input in self._button_functions and user_input != 'e': # watch out for Euler:
+                    self._button_functions[user_input]()
+                    return # ---------------------------------------------------------------------------------------->
 
             # if not in the function dict, its a string entry
             # if the last stack entry was 'enter' then the user is entering a new string value
@@ -725,15 +725,13 @@ class Calculator:
                                 self._last_stack_operation = 'error'
                                 log(self._message)
                                 return # ------------------------------------------------------------------------------>
-
-                            best_numeric = self._convert_to_best_numeric(var_value)
-                            self._locals.update({var_key: best_numeric})
+                            self._locals.update({var_key: var_value})
                             # exec adds a __builtins__ to the locals so keep a clean copy of locals and an _exec_globals
                             # for passing to exec, if you want you can modify globals here
                             for key, value in self._locals.items():
                                 self._exec_globals.update({key: value})
-                            self.stack_put(best_numeric)
-                            self._message = f"Assignment: {var_key} = {best_numeric}"
+                            self.stack_put(var_value)
+                            self._message = f"Assignment: {var_key} = {var_value}"
                             self._last_stack_operation = 'assignment'
                             log(self._message)
                             return  # --------------------------------------------------------------------------------->
@@ -945,11 +943,11 @@ class Calculator:
          """
         self._update_stack_history()
         self._message = None
+        error = None
 
         if len(self._stack) > 1:
             x_hold = self._stack.pop(0)
             y_hold = self._stack.pop(0)
-            error = None
 
             try:
                 x = x_hold
@@ -1272,11 +1270,9 @@ class Calculator:
         if isinstance(x, str):
             try:
                 val = float(x)
-                float_check = {'.', 'e-', 'E-'}
-                for item in float_check:
-                    if item in x:
-                        # this is explicitly a float, like 34.0, it can be cast to an int but the user has added the .0
-                        return val # -------------------------------------------------------------------------------------->
+                if '.' in str(val) or val < 1:
+                    # this is explicitly a float, like 34.0, it can be cast to an int but the user has added the .0
+                    return val # -------------------------------------------------------------------------------------->
                 else:
                     return int(val)
             except Exception as ex:
