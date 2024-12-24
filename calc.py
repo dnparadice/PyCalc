@@ -439,7 +439,7 @@ class Calculator:
             else:
                 if user_input in self._button_functions and user_input != 'e': # watch out for Euler:
                     self._button_functions[user_input]()
-                    return # ---------------------------------------------------------------------------------------->
+                    return # ------------------------------------------------------------------------------------->
 
             # if not in the function dict, its a string entry
             # if the last stack entry was 'enter' then the user is entering a new string value
@@ -965,14 +965,15 @@ class Calculator:
                         y = eval(y, self._exec_globals)
 
             except Exception as ex:
-                self._message = f"Error in add: eval: '{ex}' for input x: '{x_hold}' and y: '{y_hold}'"
-                error = True
+                # self._message = f"Function: '+' exception '{ex}' for input x: '{x_hold}' and y: '{y_hold}'"
+                # error = True
                 # in this case the user might just want to add the string to X, lets try that
                 if isinstance(x_hold, str):
                     x = x_hold + operation
                     self.stack_put(y_hold)
                     self.stack_put(x)
                     return # ------------------------------------------------------------------------------------------>
+
             else:
                 try:
                     if operation == '+':
@@ -997,7 +998,15 @@ class Calculator:
                     self.stack_put(result)
 
         else:
-            self._message = f"Error: not enough values on the stack to perform an operation: '{operation}')"
+            # in this case the user might just want to add the string to X, lets try that
+            if len(self._stack) == 1 and isinstance(self._stack[0], str):
+                x = self._stack.pop(0)
+                x = x + operation
+                self.stack_put(x)
+                return
+            else:
+                error = True
+                self._message = f"Error: not enough values on the stack to perform an operation: '{operation}')"
 
         if error is True: # well we tried, restore the stack
             self.stack_put(y_hold)
