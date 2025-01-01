@@ -4,6 +4,8 @@ import tkinter.filedialog as filedialog
 from tkinter import ttk
 
 from calc import Calculator
+import engnum
+
 from copy import copy
 
 import pickle
@@ -64,6 +66,8 @@ class CalculatorUiSettings:
         """
         self.save_state_on_exit = True
         self.float_format_string = '0.6f'
+        self.use_engineering_notation_format = False
+        self.eng_format_num_length = 7
         self.integer_format_string = ','
         self.plot_options_string = '-o'
         self.last_user_function_edit_name = None
@@ -231,10 +235,7 @@ class MainWindow:
         self._options_menu.add_separator()
 
         # add an option to "edit the float format string" that calls the method edit_float_format_string
-        self._options_menu.add_command(label='Edit float format string', command=self.popup_edit_float_format_string)
-
-        # add an option to "edit the integer format string" that calls the method edit_integer_format_string
-        self._options_menu.add_command(label='Edit integer format string', command=self.popup_edit_integer_format_string)
+        self._options_menu.add_command(label='Edit numeric display format', command=self.popup_edit_numeric_display_format)
 
         # add an option to "edit the plot options string" that calls the method edit_plot_options_string
         self._options_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
@@ -1020,20 +1021,49 @@ class MainWindow:
         self._update_message_display()
         self._update_locals_display()
 
-    def popup_edit_float_format_string(self):
-        """ opens a popup window to edit the float format string, has the buttons 'ok' and 'cancel' """
+    def popup_edit_numeric_display_format(self):
+        """ opens a popup window to edit the format of displayed numerics """
         # create a new window
         window = tk.Toplevel(self._root)
         window.title('Edit Float Format String')
 
-        # create a text entry field
-        entry = ttk.Entry(window)
-        entry.insert(0, self._settings.float_format_string)
-        entry.focus()
-        entry.pack()
+        # set visibility vars for the entry field
+        if self._settings.use_engineering_notation_format is True:
+            state_var = 'disabled'
+            read_only_background = 'gray'
+        else:
+            state_var = 'normal'
+            read_only_background = 'white'
 
-        def apply_float_format_string():
-            self._settings.float_format_string = entry.get()
+        # create a boole variable
+        use_eng_notation_tk = tk.IntVar(value=0)
+        use_eng_notation_tk = tk.BooleanVar(value=self._settings.use_engineering_notation_format)
+
+        ttk.Label(window, text='Float Format String').pack(padx=10)
+
+        # create a text entry field
+        float_entry = ttk.Entry(window, )
+        float_entry.insert(0, self._settings.float_format_string)
+        float_entry.config(state=state_var, background=read_only_background)
+        float_entry.focus()
+        float_entry.pack(pady=10)
+
+        # create a line seperator
+        ttk.Separator(window, orient='horizontal', ).pack(fill='x', )
+
+        ttk.Label(window, text='Integer Format String').pack(padx=10)
+
+        # create a text entry field
+        integer_entry = ttk.Entry(window, )
+        integer_entry.insert(0, self._settings.integer_format_string)
+        integer_entry.config(state=state_var, background=read_only_background)
+        integer_entry.focus()
+        integer_entry.pack(pady=10)
+
+        def apply_format_string():
+            self._settings.float_format_string = float_entry.get()
+            self._settings.integer_format_string = integer_entry.get()
+            self._settings.eng_format_num_length = int(eng_num_length.get())
             try:
                 self._update_stack_display()
             except Exception as ex:
@@ -1042,11 +1072,49 @@ class MainWindow:
             else:
                 window.destroy()
 
-        # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_float_format_string).pack()
+        def apply_eng_notation():
+            self._settings.use_engineering_notation_format = bool(use_eng_notation_tk.get())
+            float_entry.delete(0, 'end')
+            float_entry.insert(0, self._settings.float_format_string)
+            float_entry.config(state='disabled', background='gray') if use_eng_notation_tk.get() else float_entry.config(state='normal', background='white')
+
+            integer_entry.delete(0, 'end')
+            integer_entry.insert(0, self._settings.integer_format_string)
+            integer_entry.config(state='disabled', background='gray') if use_eng_notation_tk.get() else integer_entry.config(state='normal', background='white')
+
+            eng_num_length.delete(0, 'end')
+            eng_num_length.insert(0, str(self._settings.eng_format_num_length))
+            eng_num_length.config(state='disabled', background='gray') if not use_eng_notation_tk.get() else eng_num_length.config(state='normal', background='white')
+
+        # create a line seperator
+        ttk.Separator(window, orient='horizontal').pack(fill='x', pady=10)
+
+        # create a checkbox to toggle scientific notation
+        c_button = ttk.Checkbutton(window, text='Use Engineering Notation', variable=use_eng_notation_tk, onvalue=True, offvalue=False,
+                                   command=apply_eng_notation, name='eng_notation')
+        c_button.pack()
+
+
+        # add text below the checkbox that says: 'If use engineering notation is checked, the format string will be ignored'
+        ttk.Label(window, text='If Use Engineering Notation is checked, \nthe format strings will be ignored').pack( padx=10)
+
+        ttk.Label(window, text='Number of digits shown in Engineering Format').pack(padx=10)
+
+        # create a numeric field
+        eng_num_length = ttk.Entry(window, )
+        eng_num_length.insert(0, str(self._settings.eng_format_num_length))
+        eng_num_length.config(state='disabled', background='grey') if not self._settings.use_engineering_notation_format else eng_num_length.config(state='normal', background='white')
+        eng_num_length.focus()
+        eng_num_length.pack(pady=10)
+
+        # create a line seperator
+        ttk.Separator(window, orient='horizontal', ).pack(fill='x',)
+
+        # create a button to save the changes, pack right
+        ttk.Button(window, text='OK', command=apply_format_string).pack(side='right', pady=10, padx=10)
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', pady=10, padx=10)
 
     def popup_edit_plot_options_string(self):
         """ opens a popup window to edit the plot options string, has the buttons 'ok' and 'cancel' """
@@ -1077,7 +1145,7 @@ class MainWindow:
         ttk.Button(window, text='Cancel', command=window.destroy).pack()
 
     def popup_edit_integer_format_string(self):
-        """ opens a popup window to edit the integer format string, has the buttons 'ok' and 'cancel' """
+        """ deprecated method : functionality moved to Edit Numeric Display Format popup"""
         # create a new window
         window = tk.Toplevel(self._root)
         window.title('Edit Integer Format String')
@@ -1282,10 +1350,15 @@ class MainWindow:
 
             # apply user formatting to numeric types
             if isinstance(stack_entry, float):
-                stack_entry_string = f"{stack_entry:{self._settings.float_format_string}}"
-
+                if self._settings.use_engineering_notation_format is True:
+                    stack_entry_string = engnum.format_eng(stack_entry, self._settings.eng_format_num_length)
+                else:
+                    stack_entry_string = f"{stack_entry:{self._settings.float_format_string}}"
             elif isinstance(stack_entry, int):
-                stack_entry_string = f"{stack_entry:{self._settings.integer_format_string}}"
+                if self._settings.use_engineering_notation_format is True:
+                    stack_entry_string = engnum.format_eng(stack_entry, self._settings.eng_format_num_length)
+                else:
+                    stack_entry_string = f"{stack_entry:{self._settings.integer_format_string}}"
 
             # handle the case where the stack entry is None
             elif stack_entry is None:
