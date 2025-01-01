@@ -39,6 +39,7 @@ class Calculator:
         when you are popping things off the stack Y is Y even if it moves to stack[0] during the operation."""
 
     def __init__(self):
+        """ initializes the calculator object with the default values for the stack, locals, and exec_globals """
         self._stack = []
         self._last_stack_operation = None
         self._stack_history_length = 100 # units are in number of saved stacks, not a memory size

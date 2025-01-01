@@ -1,6 +1,7 @@
 import calc
 import unittest
 import math
+import engnum
 
 pi_50 = '3.14159265358979323846264338327950288419716939937510'
 c = calc.Calculator()
@@ -100,6 +101,36 @@ class TestUserEntry(unittest.TestCase):
         c.user_entry('enter')
         num = c.return_stack_for_display(0)
         self.assertEqual(num, 60)
+
+class test_engnum_lib(unittest.TestCase):
+
+    def test_zeros(self):
+        # check zero
+        self.assertEqual(engnum.format_eng(0.00000), '0.0')
+        self.assertEqual(engnum.format_eng(00000.0), '0.0')
+        self.assertEqual(engnum.format_eng(00000.0E-0), '0.0')
+        self.assertEqual(engnum.format_eng(0), '0.0')
+        self.assertEqual(engnum.format_eng(0e0), '0.0')
+        self.assertEqual(engnum.format_eng(0e-0), '0.0')
+        self.assertEqual(engnum.format_eng(-0e-0), '0.0')
+        self.assertEqual(engnum.format_eng(00000000E0), '0.0')
+        self.assertEqual(engnum.format_eng(0000.0000E-0), '0.0')
+        self.assertEqual(engnum.format_eng(-0000.0000E-0), '0.0')
+        self.assertEqual(engnum.format_eng(00), '0.0')
+        self.assertEqual(engnum.format_eng(0.0), '0.0')
+        self.assertEqual(engnum.format_eng(-0.0), '0.0')
+
+    def test_negatives(self):
+        # check negative non zero numbers defined by different exponent values
+        self.assertEqual(engnum.format_eng(-1.E-3), '-1.00000E-3')
+        self.assertEqual(engnum.format_eng(-10.0E-4), '-1.00000E-3')
+        self.assertEqual(float(engnum.format_eng(-.003)), -.003)
+        self.assertEqual(float(engnum.format_eng(-.003e1)), -.003e1)
+        self.assertEqual(float(engnum.format_eng(-.003e-12)), -.003e-12)
+        self.assertEqual(float(engnum.format_eng(-13.003e-12)), -13.003e-12)
+        self.assertEqual(float(engnum.format_eng(-13.003875678615876e-12)), -13.003875678615876e-12)
+
+
 
 
 
