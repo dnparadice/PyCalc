@@ -423,10 +423,12 @@ class Calculator:
 
         # most common input is a string
         if isinstance(user_input, str):
-            # check if the user is entering a button function
-            # if user_input in self._button_functions and user_input != 'e': # watch out for Euler
-            #     self._button_functions[user_input]()
-            #     return  # --------------------------------------------------------------------------------------------->
+            if len(self._stack) > 0:
+                if isinstance(self._stack[0], list|tuple|set|np.ndarray):
+                    # pushes these types to stack[1] and inserts string at stack[0]
+                    self.stack_put(user_input)
+                    self._last_stack_operation = 'user_entry'
+                    return  # ------------------------------------------------------------------------------------->
 
             # check X for '(' to see if user is entering a function like (1+1)
             if len(self._stack) > 0:
@@ -484,10 +486,46 @@ class Calculator:
                 self._message = f"Function: {function}({x}) = {result}"
 
             except Exception as ex:
-                self.stack_put(x)
-                self._message = f"Error: cannot perform function: '{function}' on non-number: '{x}' with error: '{ex}'"
-                log(self._message)
-                raise Exception(self._message)
+                # check if object is iterable
+                try:
+                    _iterable = iter(x)
+                    # need to write a methoid that handles iterables in a good way
+
+                    if isinstance(x, list|tuple|set):
+                        result = []
+
+                        # apply the function for each item in the list
+                        for item in x:
+                            result.append(getattr(self._math, function)(item))
+
+                        # set the result to the correct type
+                        if isinstance(x, tuple):
+                            result = tuple(result)
+                        elif isinstance(x, set):
+                            result = set(result)
+                        else:
+                            pass  # return a list
+
+                    elif isinstance(x, np.ndarray):
+                        try:
+                            result = getattr(x, f'np.{function}')() # function like 'sin'
+                            print(result)
+                        except Exception as ex:
+                            result = ex
+                            print(ex)
+
+                    # end method returns result
+
+                    # result = getattr(self._math, function)(x)
+                    self.stack_put(result)
+                    self._message = f"Function: {function}({x}) = {result}"
+
+                except TypeError as ex: # it's not iterable and it's not a number so put it back on the stack
+
+                    self.stack_put(x)
+                    self._message = f"Error: cannot perform function: '{function}' on non-number: '{x}' with error: '{ex}'"
+                    log(self._message)
+                    raise Exception(self._message)
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: '{self._stack[0]}'"
 
@@ -779,6 +817,7 @@ class Calculator:
                 # at this point X is like 'sin' or 'cos' so pop the name and call the math function
                 function = self._stack.pop(0) # the math functions expect the argument in X not the name
 
+                args=[]
                 if x_str in self._user_functions:
                     try:
                         sig = inspect.signature(eval(function, self._exec_globals))  # like: <Signature (x, y, z=3)>
@@ -868,7 +907,7 @@ class Calculator:
             # next try exec --------------------------
             except Exception as ex:
 
-                if 'import' not in x_temp:
+                if 'import' not in str(x_temp):
                     try:
                         exec(x_temp, self._exec_globals)  # this works on input like 'import os' with no return value
                         self._last_stack_operation = 'exec'
