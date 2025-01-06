@@ -44,7 +44,7 @@ def format_eng(number_in, max_digits_displayed=7):
     abs_num_in = abs(number_in)
     mantissa_initial = _get_normalized_mantissa(abs_num_in)
     exponent_initial = _get_exponent(abs_num_in)
-    print(f"abs_num_in: {abs_num_in}, mantissa: {mantissa_initial}, exponent: {exponent_initial}")
+    # print(f"abs_num_in: {abs_num_in}, mantissa: {mantissa_initial}, exponent: {exponent_initial}")
 
     # if the number is between 0.001 and 1000, trim long numbers and return the number as a string
     if 0.001 < abs(abs_num_in) < 1000:
@@ -55,14 +55,19 @@ def format_eng(number_in, max_digits_displayed=7):
 
     # create a list of bytes from the mantissa
     bites = list(str(mantissa_initial).encode('utf-8'))
-    print(f"bytes: {bites}")
-    point = bites.pop(1)  # remove the decimal point (will be reinserted after determining the exponent)
-    print(f"bytes: {bites}")
+    # print(f"bytes: {bites}")
+    try:
+        point = bites.pop(1)  # remove the decimal point (will be reinserted after determining the exponent)
+    except IndexError:
+        # print(f"engnum;format_eng decimal not at index 1 exception: number passed: {number_in}, mantissa: "
+        #       f"{mantissa_initial}, exponent: {exponent_initial}")
+        return str(number_in)  # -------------------------------------------------------------------------------------->
+    # print(f"bytes: {bites}")
 
     # determine how to shift the decimal point and exponent
     div = abs(exponent_initial) // 3
     remainder = abs(exponent_initial) % 3
-    print(f"div: {div}, remainder: {remainder}")
+    # print(f"div: {div}, remainder: {remainder}")
 
     # put the point back in the list
     if abs_num_in < 1:
@@ -89,8 +94,8 @@ def format_eng(number_in, max_digits_displayed=7):
 
     # convert the list back to a string
     new_num = f"{'-' if number_in < 0 else ''}{bytearray(trimmed).decode()}E{exp_final}"
-    print(f"new_num: {new_num}, original: {number_in}")
-    print(f"equal: {float(new_num) == number_in}")
+    # print(f"new_num: {new_num}, original: {number_in}")
+    # print(f"equal: {float(new_num) == number_in}")
     return new_num
 
 def test_format_eng_equal(number_in, max_digits_displayed=7) -> bool:
@@ -130,11 +135,11 @@ def test_format_eng_equal(number_in, max_digits_displayed=7) -> bool:
 
 
 # demo code:
-print(f"test: {test_format_eng_equal(-3.333333333333e-9, max_digits_displayed=3)}")
+# print(f"test: {test_format_eng_equal(-3.333333333333e-9, max_digits_displayed=3)}")
 # input = 0.45
 # print(f">>>input: {input} output: {eng_format(input, True)}")
 # rsp = format_eng(input)
 # print(f"rsp: {rsp}")
-mnum = 45000
-print(f"mantissa of {mnum}: {_get_normalized_mantissa(mnum)}")
-print(f"exponent of {mnum}: {_get_exponent(mnum)}")
+# mnum = 45000
+# print(f"mantissa of {mnum}: {_get_normalized_mantissa(mnum)}")
+# print(f"exponent of {mnum}: {_get_exponent(mnum)}")

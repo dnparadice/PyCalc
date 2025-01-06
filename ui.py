@@ -369,7 +369,6 @@ class MainWindow:
         log(f'error deprecated - message field')
 
 
-
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
         """ returns a menu item by passing the menu object and the label of the item
@@ -755,7 +754,7 @@ class MainWindow:
             self._message_field = tk.Text(self._top_frame, state='normal', height=2, font=self._settings.message_font)
             # set width with settings
             self._message_field.config(width=self._settings.message_width)
-            self._message_field.pack()
+            self._message_field.pack(expand=True, fill='x')
             self._settings.show_message_field = True
             self._tk_var_menu_view_show_message_field.set(True)
             self._update_message_display()
