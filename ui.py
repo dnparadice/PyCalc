@@ -365,9 +365,6 @@ class MainWindow:
 
     """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
 
-    def _update_visible_ui_object_message_field(self):
-        log(f'error deprecated - message field')
-
 
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
@@ -496,7 +493,8 @@ class MainWindow:
         # create a text entry field
         entry = ttk.Entry(window)
         entry.insert(0, value)
-        entry.pack()
+        # expand with window
+        entry.pack(expand=True, fill='x')
 
         def apply_value():
             new_value = entry.get()
@@ -547,7 +545,7 @@ class MainWindow:
         # create a text entry field
         entry = ttk.Entry(window)
         entry.insert(0, value)
-        entry.pack()
+        entry.pack(expand=True, fill='x')
 
         def apply_value():
             new_value = entry.get()
@@ -625,7 +623,7 @@ class MainWindow:
                            text=button,
                            command=lambda btn=button: self.button_press(btn),
                            width=2+button_width_mod,
-                           ).grid(row=i // 3, column=i % 3, )
+                           ).grid(row=i // 3, column=i % 3,)
 
             self._numeric_buttons.pack()
 
@@ -754,7 +752,7 @@ class MainWindow:
             self._message_field = tk.Text(self._top_frame, state='normal', height=2, font=self._settings.message_font)
             # set width with settings
             self._message_field.config(width=self._settings.message_width)
-            self._message_field.pack(expand=True, fill='x')
+            self._message_field.pack(expand=True, fill='x', padx=3)
             self._settings.show_message_field = True
             self._tk_var_menu_view_show_message_field.set(True)
             self._update_message_display()
