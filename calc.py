@@ -430,13 +430,21 @@ class Calculator:
                     if self._last_stack_operation == 'enter' and len(self._stack) > 1:
                         # in this case you might have a duplicate in X and Y so replace X instead of shifting up
                         if self._stack[0] == self._stack[1]:
-                            self.stack_put(user_input, shift_up=False)
-                            self._last_stack_operation = 'user_entry'
-                            return  # ----------------------------------------------------------------------------->
+                            if user_input in self._button_functions and user_input != 'e':  # watch out for Euler:
+                                self._button_functions[user_input]()
+                                return  # ----------------------------------------------------------------------------->
+                            else:
+                                self.stack_put(user_input, shift_up=False)
+                                self._last_stack_operation = 'user_entry'
+                                return  # ----------------------------------------------------------------------------->
 
-                    self.stack_put(user_input)
-                    self._last_stack_operation = 'user_entry'
-                    return  # ------------------------------------------------------------------------------------->
+                    if user_input in self._button_functions and user_input != 'e':  # watch out for Euler:
+                        self._button_functions[user_input]()
+                        return  # ------------------------------------------------------------------------------------->
+                    else:
+                        self.stack_put(user_input)
+                        self._last_stack_operation = 'user_entry'
+                        return  # ------------------------------------------------------------------------------------->
 
             # check X for '(' to see if user is entering a function like (1+1)
             if len(self._stack) > 0:
