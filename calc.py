@@ -424,11 +424,27 @@ class Calculator:
         # most common input is a string
         if isinstance(user_input, str):
             if len(self._stack) > 0:
-                if isinstance(self._stack[0], list|tuple|set|np.ndarray):
+                if isinstance(self._stack[0], list|tuple|set|np.ndarray|int|float):
                     # pushes these types to stack[1] and inserts string at stack[0]
-                    self.stack_put(user_input)
-                    self._last_stack_operation = 'user_entry'
-                    return  # ------------------------------------------------------------------------------------->
+
+                    if self._last_stack_operation == 'enter' and len(self._stack) > 1:
+                        # in this case you might have a duplicate in X and Y so replace X instead of shifting up
+                        if self._stack[0] == self._stack[1]:
+                            if user_input in self._button_functions and user_input != 'e':  # watch out for Euler:
+                                self._button_functions[user_input]()
+                                return  # ----------------------------------------------------------------------------->
+                            else:
+                                self.stack_put(user_input, shift_up=False)
+                                self._last_stack_operation = 'user_entry'
+                                return  # ----------------------------------------------------------------------------->
+
+                    if user_input in self._button_functions and user_input != 'e':  # watch out for Euler:
+                        self._button_functions[user_input]()
+                        return  # ------------------------------------------------------------------------------------->
+                    else:
+                        self.stack_put(user_input)
+                        self._last_stack_operation = 'user_entry'
+                        return  # ------------------------------------------------------------------------------------->
 
             # check X for '(' to see if user is entering a function like (1+1)
             if len(self._stack) > 0:

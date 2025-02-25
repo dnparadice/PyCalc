@@ -305,6 +305,9 @@ class MainWindow:
         # bind the program exit to the exit method
         self._root.protocol("WM_DELETE_WINDOW", self.user_exit)
 
+        # bind command+c to the copy method
+        self._root.bind('<Command-c>', lambda event: self.copy_stack_value())
+
         """  ----------------------------  Stack, Messages, Locals, Buttons ---------------------------------------  """
 
         stack_rows = self._settings.stack_rows
@@ -441,6 +444,7 @@ class MainWindow:
         right_click_menu = tk.Menu(self._root, tearoff=0)
         right_click_menu.add_command(label='Insert value to stack at X', command=self._insert_value_to_stack_at_x)
         right_click_menu.add_command(label='Edit value', command=self._edit_variable_value)
+        right_click_menu.add_command(label='Copy value', command=self._copy_variable_value)
 
         # add a line seperator to the menu
         right_click_menu.add_separator()
@@ -453,11 +457,13 @@ class MainWindow:
         # create a right click menu
         right_click_menu = tk.Menu(self._root, tearoff=0)
         right_click_menu.add_command(label='Edit value', command=self._edit_stack_value)
+        right_click_menu.add_command(label='Copy Value', command=self.copy_stack_value)
 
         # add a line seperator to the menu
         right_click_menu.add_separator()
         # add item: "remove selected item"
         right_click_menu.add_command(label='Clear Stack', command=self.clear_stack)
+
         right_click_menu.post(event.x_root, event.y_root)
 
     def _insert_value_to_stack_at_x(self):
@@ -470,6 +476,16 @@ class MainWindow:
         self._c.user_entry(value)
         self._update_stack_display()
         self._update_message_display(f"Inserted value at x: {key}={value}")
+
+    def _copy_variable_value(self):
+        """ copies the value of the selected item in the locals table to the clipboard """
+        selected = self._locals_table.selection()
+        if len(selected) == 0:
+            return
+        value = self._locals_table.item(selected)['values'][0]
+        self._root.clipboard_clear()
+        self._root.clipboard_append(value)
+        self._root.update()
 
     def _edit_variable_value(self):
         """ opens a popup window to edit the value of the selected item in the locals table """
@@ -982,6 +998,17 @@ class MainWindow:
             self.menu_save_state(save_path=self._autosave_path)
             log(f"clean exit")
         self._root.quit()
+
+    def copy_stack_value(self):
+        """ copies the value of the selected stack item to the clipboard """
+        selected = self._stack_table.selection()
+        if len(selected) == 0:
+            return
+        sel = self._stack_table.item(selected)
+        idx = sel['text']
+        value = self._c.return_stack_for_display(int(idx))
+        self._root.clipboard_clear()
+        self._root.clipboard_append(value)
 
     def undo_last_action(self):
         self._c.undo_last_action()
