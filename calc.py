@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from copy import copy
 import inspect
 import builtins
+import sys
 
 try:
     from logger import Logger
@@ -12,6 +13,12 @@ try:
     log = logger.print_to_console
 except ImportError:
     log = print
+
+# log the python imported lib versions
+log(f"Python version: {sys.version}")
+log(f"numpy version: {np.__version__}")
+
+
 
 class Calculator:
     """ A class that implements the backend of an RPN style calculator with the ability to perform RPN style operations

@@ -295,18 +295,18 @@ class MainWindow:
         # add binding for paste from os clipboard
         self._root.bind('<<Paste>>', lambda event: self.paste(self._root.clipboard_get()))
 
-        # add a binding for undo
-        self._root.bind('<Control-z>', lambda event: self.undo_last_action())
-        self._root.bind('<Command-z>', lambda event: self.undo_last_action())
-
-        # add a binding for save state
-        self._root.bind('<Control-s>', lambda event: self.menu_save_state())
 
         # bind the program exit to the exit method
         self._root.protocol("WM_DELETE_WINDOW", self.user_exit)
 
-        # bind command+c to the copy method
-        self._root.bind('<Command-c>', lambda event: self.copy_stack_value())
+        if self._os_type.name == OsType.MAC:
+            self._root.bind('<Command-c>', lambda event: self.copy_stack_value())
+            self._root.bind('<Command-z>', lambda event: self.undo_last_action())
+            self._root.bind('<Command-s>', lambda event: self.menu_save_state())
+        else: # Windows and other
+            self._root.bind('<Control-c>', lambda event: self.copy_stack_value())
+            self._root.bind('<Control-z>', lambda event: self.undo_last_action())
+            self._root.bind('<Control-s>', lambda event: self.menu_save_state())
 
         """  ----------------------------  Stack, Messages, Locals, Buttons ---------------------------------------  """
 
