@@ -56,13 +56,15 @@ def format_eng(number_in, max_digits_displayed=7):
     # create a list of bytes from the mantissa
     bites = list(str(mantissa_initial).encode('utf-8'))
     # print(f"bytes: {bites}")
-    try:
-        point = bites.pop(1)  # remove the decimal point (will be reinserted after determining the exponent)
-    except IndexError:
-        # print(f"engnum;format_eng decimal not at index 1 exception: number passed: {number_in}, mantissa: "
-        #       f"{mantissa_initial}, exponent: {exponent_initial}")
-        return str(number_in)  # -------------------------------------------------------------------------------------->
-    # print(f"bytes: {bites}")
+    point = [46]  # byte value for decimal point, default is a period
+    if len(bites) > 1: # if the mantissa is a single digit like 1, 4, 7, etc... there is no decimal point
+        try:
+            point = bites.pop(1)  # remove the decimal point (will be reinserted after determining the exponent)
+        except IndexError:
+            # print(f"engnum;format_eng decimal not at index 1 exception: number passed: {number_in}, mantissa: "
+            #       f"{mantissa_initial}, exponent: {exponent_initial}")
+            return str(number_in)  # -------------------------------------------------------------------------------------->
+        # print(f"bytes: {bites}")
 
     # determine how to shift the decimal point and exponent
     div = abs(exponent_initial) // 3
