@@ -2,6 +2,8 @@ import inspect
 import tkinter as tk
 import tkinter.filedialog as filedialog
 from tkinter import ttk
+from numpy import ndarray as ndarray
+import struct
 
 from calc import Calculator
 import engnum
@@ -456,6 +458,7 @@ class MainWindow:
         """ creates a right click menu for the stack table """
         # create a right click menu
         right_click_menu = tk.Menu(self._root, tearoff=0)
+        right_click_menu.add_command(label='Get Info', command=self._get_stack_value_info)
         right_click_menu.add_command(label='Edit value', command=self._edit_stack_value)
         right_click_menu.add_command(label='Copy Value', command=self.copy_stack_value)
 
@@ -998,6 +1001,41 @@ class MainWindow:
             self.menu_save_state(save_path=self._autosave_path)
             log(f"clean exit")
         self._root.quit()
+
+    def _get_stack_value_info(self):
+        """ bound to the right click menu to get info on the selected stack item
+        gets info from the selected stack item and displays it in the message field """
+        try:
+            selected = self._stack_table.selection()
+            if len(selected) == 0:
+                return
+            sel = self._stack_table.item(selected)
+            idx = sel['text']
+            value = self._c.return_stack_for_display(int(idx)) # is the actual type, not a string
+            if isinstance(value, str):
+                info = f'"INFO: {value}, len: {len(value)}, bytes: {str(value).encode()}"'
+            elif isinstance(value, int):
+                info = f"INFO: {value}, bytes: {int(value).to_bytes(byteorder="big")}, big-endian "
+            elif isinstance(value, float):
+                info = f"INFO: {value}, bytes: {struct.pack('>d', value)}, big-endian "
+            elif isinstance(value, ndarray):
+                se = value # type: ndarray
+                info = (f"INFO: [{float(se[0])}, ... , {float(se[-1])}] "
+                                      f"shape: {se.shape}, dtype: {se.dtype}, max: {se.max():0.3f}, "
+                                      f"min: {se.min():0.3f}, mean: {se.mean():0.3f}, sum: {se.sum():0.3f}")
+            elif isinstance(value, list):
+                entry_type = type(value[0])
+                if entry_type is int or entry_type is float:
+                    sm = sum(value)
+                    mean = sm / len(value)
+                    info = (f"INFO: {value}, len: {len(value)}, type: {entry_type}, max: {max(value):0.3f}, min: {min(value):0.3f}, "
+                            f"mean: {mean:0.3f}, sum: {sm:0.3f}")
+            else:
+                info = f"INFO: {value}, type: {type(value)}"
+        except Exception as ex:
+            info = f"Error getting info on stack item: {ex}"
+
+        self._update_message_display(info)
 
     def copy_stack_value(self):
         """ copies the value of the selected stack item to the clipboard """
