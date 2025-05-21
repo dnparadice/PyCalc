@@ -72,7 +72,7 @@ at a time so you can also enter 'sin(3)' as:
     ue('3')
     ue(')')
     c.enter_press()
-   >>> Evaluated: sin(43.7) + 17.3 to 17.0214373937804
+   >>> Evaluated: sin(3) to 0.1411200080598672
     ```
 This is useful if you want to send user keyboard events directly to the calculator from some other User Interface. For 
 example if you already have a snazzy calculator UI and you want to use this calculator backend. I'm looking at you 

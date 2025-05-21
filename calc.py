@@ -47,6 +47,8 @@ class Calculator:
 
     def __init__(self):
         """ initializes the calculator object with the default values for the stack, locals, and exec_globals """
+        # print the version of python
+        print(f"Python version: {sys.version}")
         self._stack = []
         self._last_stack_operation = None
         self._stack_history_length = 100 # units are in number of saved stacks, not a memory size
