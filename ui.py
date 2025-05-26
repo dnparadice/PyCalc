@@ -467,6 +467,7 @@ class MainWindow:
         right_click_menu.add_separator()
         # add item: "remove selected item"
         right_click_menu.add_command(label='Clear Stack', command=self.clear_stack)
+        right_click_menu.add_command(label='Clear Selected', command=self.stack_clear_selected)
 
         right_click_menu.post(event.x_root, event.y_root)
 
@@ -1048,6 +1049,18 @@ class MainWindow:
         value = self._c.return_stack_for_display(int(idx))
         self._root.clipboard_clear()
         self._root.clipboard_append(value)
+
+    def stack_clear_selected(self):
+        """ clears the selected value from the stack """
+        selected = self._stack_table.selection()
+        if len(selected) == 0:
+            return
+        sel = self._stack_table.item(selected)
+        idx = sel['text']
+        popped = self._c.clear_stack_level(int(idx))
+        self._update_stack_display()
+        msg = f"Cleared stack level {idx} value: {popped}"
+        self._update_message_display(msg)
 
     def undo_last_action(self):
         self._c.undo_last_action()
