@@ -1,8 +1,11 @@
 ## Hello and welcome to PyCalc, the RPN ~~calculator~~ ~~IDE~~ program that loves Python
 
-![PyCalc](media/PyCalc-UiAndPlot-250610.jpg)
+
+<img src="media/PyCalc-UiAndPlot-250610.jpg" alt="calculator and plot" width="800" height="auto">
+
+
 _______________________
-![PyCalc](media/PyCalc_UserFunctions_DarkMode.jpg)
+<img src="media/PyCalc_UserFunctions_DarkMode.jpg" alt="calculator and user functions" width="800" height="auto">
 
 This is the best calculator you will ever use because it packs the ecosystem of Python 
 into a fast and familiar User Interface. 
@@ -32,6 +35,11 @@ So this project was born and has become a go-to tool for daily engineering math 
 - [x] Store variables of any type including numbers, arrays, functions, class instances, and more
 - [x] Save / Restore sessions and state, by default launches with the last state 
 - [x] Dark mode and light mode themes (tracks the system theme)
+
+What makes this program different than other calculators and IDEs is it's ability to interact with Python objects 
+in an RPN style stack. For example as shown in the first picture, if you have an ndarray at stack position 0 and an 
+integer at stack position 1 you can press * and the calculator will multiply the array by the integer and put the result at
+stack position 0.
 
 ### Intended Users
 - People that want a really powerful calculator 
@@ -70,6 +78,8 @@ wrapper on the math.log function so calling log(3, 10) throws an error. If you w
 this you must explicitly call: 'math.log(3, 10)' as the builtin log method (for this calculator) is 
 always base 10.
 
+__________________________________
+
 ### Examples (using the UI)
 
 #### basic math
@@ -78,20 +88,20 @@ always base 10.
 2) press: **enter** -- either on the UI or the keyboard
 3) press: **2**
 4) press: **+**
-5) The result of the operation (1+2) is displayed in the stack view in the X position as '3'
+5) The result of the operation (1+2) is displayed in the stack view in the X position as *3*
 
 #### using math functions
 
 1) press: **2**
 2) press: **enter**
-3) press: **log**  -- Note that you can either press the **log** button or type 'log' and press enter
+3) press: **log**  -- Note that you can either press the **log** button or type *log* and press enter
 4) The result of the operation (log(2)) is displayed in the stack view in the X position as '0.6931471805599453'
 
 #### using variables
 
 1) press: **2**
 2) press: **enter**
-3) type: 'my_var='
+3) type: *my_var=*
 4) press: **enter**
 5) The value *2* is stored in the variable *my_var* and is now displayed in the variable view
 
@@ -194,43 +204,6 @@ name with arguments and then pressing enter. For example:
 2) press: **enter** -- this will call the randint function from the random library with the arguments 1 and 100 
 and display the result in the stack view
 
-#### Saving and Restoring Sessions
-
-The calculator has the ability to save and restore sessions. By default, the calculator will save its state on exit
-and load the state on start. The state is saved in the directory where the calculator is run from as 
-"last_state_autosave.pycalc". The save and restore state includes the stack, history, variables and calculator settings.
-
-Saving 
-1) With some values on the stack and/or in variables press: *ctrl+s* or navigate to the **file** menu and select **save**
-2) Select a location and name for the session file and press **save**
-
-Restoring 
-
-3) With the calculator open press: *ctrl+o* or navigate to the file menu and select **open**
-4) In the file dialog select the session file and press **open**
-
-#### User Options
-
-You can set some options in the calculator by navigating to the 'options' menu. The options are:
-- **Save State on Exit** -- Turn this off and the calculator will initialize on launch each time.
-- **Edit plot format string** -- This will open a dialog where you can set the format string for plots, for valid strings, 
-see Parameters: **fmt** here: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html
-
-- **Edit numeric display format** -- (see image below) This will open a dialog where you can set the format string for integers, 
-see: https://fstring.help/cheat/
- additionally you can select the "Use Engineering Notation" checkbox to use engineering notation for floats. This will 
-format the exponent to be a multiple of 3. The "Number of digits shown" is literary the number of digits shown.  
-
-![PyCalc](media/PyCalc-FloatFormatWindow.jpg)
-
-### View Options
-You can navigate to **View** menu to toggle the visibility of the stack, variables, and user functions windows. There 
-are two modes, 
-- **Standard View** shows all buttons, the message field, the variable viewer and the stack.
-- **Mini View** shows only the stack view and reduces the advisable number of stack rows to 2.
-- **Show user functions** Opens window that shows all user functions in memory.
-- **Show all functions** Opens window shows all imported functions in memory. This list does not include **User Functions**
-
 ### Working with User Functions
 
 The calculator allows the user to define functions that can be used in the calculator and stored with 
@@ -283,6 +256,55 @@ at stack position 0. Now press the **Plot** button and the resulting plot will s
 2) This will open a popup window with a list of all user functions. Select the function you want to remove 
 and press 'Remove'
 
+___________________
+
+### User Options
+
+You can set some options in the calculator by navigating to the 'options' menu. The options are:
+- **Save State on Exit** -- Turn this off and the calculator will initialize on launch each time.
+- **Edit plot format string** -- This will open a dialog where you can set the format string for plots, for valid strings, 
+see Parameters: **fmt** here: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html
+
+- **Edit numeric display format** -- (see image below) This will open a dialog where you can set the format string for integers, 
+see: https://fstring.help/cheat/
+ additionally you can select the "Use Engineering Notation" checkbox to use engineering notation for floats. This will 
+format the exponent to be a multiple of 3. The "Number of digits shown" is literary the number of digits shown.  
+
+<img src="media/PyCalc-FloatFormatWindow.jpg" alt="float format window" width="300" height="Auto">
+
+___________________
+
+### View Options
+You can navigate to **View** menu to toggle the visibility of the stack, variables, and user functions windows. There 
+are two modes, 
+- **Standard View** shows all buttons, the message field, the variable viewer and the stack.
+- **Mini View** shows only the stack view and reduces the advisable number of stack rows to 2.
+- **Show user functions** Opens window that shows all user functions in memory.
+- **Show all functions** Opens window shows all imported functions in memory. This list does not include **User Functions**
+
+
+<img src="media/PyCalc-minimode2.png" alt="mini mode" width="250" height="Auto">
+
+Mini View shown above with message field and stack view.
+
+___________________
+
+### Saving and Restoring Sessions
+
+The calculator has the ability to save and restore sessions. By default, the calculator will save its state on exit
+and load the state on start. The state is saved in the directory where the calculator is run from as 
+"last_state_autosave.pycalc". The save and restore state includes the stack, history, variables and calculator settings.
+
+Saving 
+1) With some values on the stack and/or in variables press: *ctrl+s* or navigate to the **file** menu and select **save**
+2) Select a location and name for the session file and press **save**
+
+Restoring 
+
+3) With the calculator open press: *ctrl+o* or navigate to the file menu and select **open**
+4) In the file dialog select the session file and press **open**
+
+__________________
 
 #### Using the API / CLI
 1) If you don't want the UI you can use the calc.py module  and instantiate an instance of the Calculator class
@@ -316,9 +338,13 @@ This is useful if you want to send user keyboard events directly to the calculat
 example if you already have a snazzy calculator UI and you want to use this calculator backend. I'm looking at you 
 flutter and js devs. 
 
+________________________
+
 ### Future Features 
 - Installer for the UI 
 - better array / tensor viewer 
+
+________________________
 
 ### If you made it this far
 
