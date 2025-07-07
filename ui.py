@@ -1,3 +1,4 @@
+import ast
 import inspect
 import tkinter as tk
 import tkinter.filedialog as filedialog
@@ -1079,7 +1080,8 @@ class MainWindow:
         if isinstance(value, str):
             if '\n' in value: # go ahead and split the string into lines
                 lines = value.split('\n')
-                tags = {'def', 'class'}
+
+                tags = {'def', 'class'} # for when you paste a function or class definition
                 for tag in tags:
                     if tag in lines[0]:
                         for line in lines:
@@ -1087,11 +1089,27 @@ class MainWindow:
                         self.enter_press()
                         break
                 else:  # tag not found
-                    self.button_press(str(lines))
-                    self.enter_press()
+
+                    # remove empty lines
+                    lines = [float(line) for line in lines if line.strip() != '']
+
+                    try:
+                        # if its a number, lets make it a numpy array
+                        if isinstance(lines[0], float | int):
+                            self.button_press(str(lines))
+                            self.enter_press()
+                            self.button_press('np.array')
+                        else:
+                            self.button_press(str(lines))
+
+                        self.enter_press()
+
+                    except Exception as ex:
+                        raise Exception (f"Error evaluating pasted value: {ex}")
 
             else:
                 self.button_press(str(value))
+                self.enter_press()
 
         self._update_stack_display()
         self._update_message_display()
