@@ -14,6 +14,12 @@ try:
 except ImportError:
     log = print
 
+# log the python imported lib versions
+log(f"Python version: {sys.version}")
+log(f"numpy version: {np.__version__}")
+
+
+
 class Calculator:
     """ A class that implements the backend of an RPN style calculator with the ability to perform RPN style operations
     on numbers AND python objects. The primary interface is the 'user_entry(input: any)' method which can handle most
@@ -1246,17 +1252,18 @@ class Calculator:
 
         self._last_stack_operation = None
 
-    def clear_stack_level(self, level=0):
-        """ clears the stack level, using pop, indexing the stack starts at 0.
-         @param level: the stack level to clear, if level is out of range, the stack is not cleared """
+    def clear_stack_level(self, idx=0) -> any:
+        """ pops the value of the stack at idx, indexing the stack starts at 0.
+         @param idx: the stack level (idx) to clear, if idx is out of range, the stack is not cleared """
         self._update_stack_history()
         self._message = None
-        log(f"Clear Stack Level: {level}")
-        if level < len(self._stack):
-            self._stack.pop(level)
+        log(f"Clear Stack Level: {idx}")
+        if idx < len(self._stack):
+            return self._stack.pop(idx)
         else:
-            self._message = f"Error: cannot clear stack level: '{level}', it is out of range"
+            self._message = f"Error: cannot clear stack level: '{idx}', it is out of range"
             log(self._message)
+            return None
 
     def clear_all_variables(self):
         """ clears all the local variables """

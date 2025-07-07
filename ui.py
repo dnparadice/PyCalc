@@ -1,7 +1,9 @@
+import ast
 import inspect
 import tkinter as tk
 import tkinter.filedialog as filedialog
 from tkinter import ttk
+from tkinter.ttk import Style
 from numpy import ndarray as ndarray
 import struct
 
@@ -9,7 +11,7 @@ from calc import Calculator
 import engnum
 
 from copy import copy
-
+from struct import pack
 import pickle
 from enum import Enum
 from platform import system as platform_system
@@ -30,7 +32,7 @@ class OsType(Enum):
 
 
 class UiFrame(tk.Frame):
-    """ extends the TkFrame class to add a no nonsense flag for indicating if the widget is visible or not in this
+    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this
     context
 
     Warning, the coverage for self.visible is not complete, it is only set in the pack, pack_forget, and destroy methods
@@ -297,18 +299,18 @@ class MainWindow:
         # add binding for paste from os clipboard
         self._root.bind('<<Paste>>', lambda event: self.paste(self._root.clipboard_get()))
 
-        # add a binding for undo
-        self._root.bind('<Control-z>', lambda event: self.undo_last_action())
-        self._root.bind('<Command-z>', lambda event: self.undo_last_action())
-
-        # add a binding for save state
-        self._root.bind('<Control-s>', lambda event: self.menu_save_state())
 
         # bind the program exit to the exit method
         self._root.protocol("WM_DELETE_WINDOW", self.user_exit)
 
-        # bind command+c to the copy method
-        self._root.bind('<Command-c>', lambda event: self.copy_stack_value())
+        if self._os_type.name == OsType.MAC:
+            self._root.bind('<Command-c>', lambda event: self.copy_stack_value())
+            self._root.bind('<Command-z>', lambda event: self.undo_last_action())
+            self._root.bind('<Command-s>', lambda event: self.menu_save_state())
+        else: # Windows and other
+            self._root.bind('<Control-c>', lambda event: self.copy_stack_value())
+            self._root.bind('<Control-z>', lambda event: self.undo_last_action())
+            self._root.bind('<Control-s>', lambda event: self.menu_save_state())
 
         """  ----------------------------  Stack, Messages, Locals, Buttons ---------------------------------------  """
 
@@ -466,6 +468,7 @@ class MainWindow:
         right_click_menu.add_separator()
         # add item: "remove selected item"
         right_click_menu.add_command(label='Clear Stack', command=self.clear_stack)
+        right_click_menu.add_command(label='Clear Selected', command=self.stack_clear_selected)
 
         right_click_menu.post(event.x_root, event.y_root)
 
@@ -1048,6 +1051,18 @@ class MainWindow:
         self._root.clipboard_clear()
         self._root.clipboard_append(value)
 
+    def stack_clear_selected(self):
+        """ clears the selected value from the stack """
+        selected = self._stack_table.selection()
+        if len(selected) == 0:
+            return
+        sel = self._stack_table.item(selected)
+        idx = sel['text']
+        popped = self._c.clear_stack_level(int(idx))
+        self._update_stack_display()
+        msg = f"Cleared stack level {idx} value: {popped}"
+        self._update_message_display(msg)
+
     def undo_last_action(self):
         self._c.undo_last_action()
         self._update_stack_display()
@@ -1065,7 +1080,8 @@ class MainWindow:
         if isinstance(value, str):
             if '\n' in value: # go ahead and split the string into lines
                 lines = value.split('\n')
-                tags = {'def', 'class'}
+
+                tags = {'def', 'class'} # for when you paste a function or class definition
                 for tag in tags:
                     if tag in lines[0]:
                         for line in lines:
@@ -1073,11 +1089,27 @@ class MainWindow:
                         self.enter_press()
                         break
                 else:  # tag not found
-                    self.button_press(str(lines))
-                    self.enter_press()
+
+                    # remove empty lines
+                    lines = [float(line) for line in lines if line.strip() != '']
+
+                    try:
+                        # if its a number, lets make it a numpy array
+                        if isinstance(lines[0], float | int):
+                            self.button_press(str(lines))
+                            self.enter_press()
+                            self.button_press('np.array')
+                        else:
+                            self.button_press(str(lines))
+
+                        self.enter_press()
+
+                    except Exception as ex:
+                        raise Exception (f"Error evaluating pasted value: {ex}")
 
             else:
                 self.button_press(str(value))
+                self.enter_press()
 
         self._update_stack_display()
         self._update_message_display()
