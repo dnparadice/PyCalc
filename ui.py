@@ -1026,6 +1026,20 @@ class MainWindow:
                 info = (f"INFO: [{float(se[0])}, ... , {float(se[-1])}] "
                                       f"shape: {se.shape}, dtype: {se.dtype}, max: {se.max():0.3f}, "
                                       f"min: {se.min():0.3f}, mean: {se.mean():0.3f}, sum: {se.sum():0.3f}")
+                calc = self._c
+                calc.user_entry(f"array_min={se.min():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_max={se.max():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_mean={se.mean():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_stddev={se.std():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_sum={se.sum():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_length={len(se)}")
+                calc.enter_press()
+                self._update_locals_display()
             elif isinstance(value, list):
                 entry_type = type(value[0])
                 if entry_type is int or entry_type is float:
@@ -1090,10 +1104,10 @@ class MainWindow:
                         break
                 else:  # tag not found
 
-                    # remove empty lines
-                    lines = [float(line) for line in lines if line.strip() != '']
-
                     try:
+                        # remove empty lines
+                        lines = [float(line.replace(',', '')) for line in lines if line.strip() != '']
+
                         # if its a number, lets make it a numpy array
                         if isinstance(lines[0], float | int):
                             self.button_press(str(lines))
