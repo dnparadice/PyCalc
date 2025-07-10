@@ -6,6 +6,7 @@ from copy import copy
 import inspect
 import builtins
 import sys
+import plots
 
 try:
     from logger import Logger
@@ -417,6 +418,17 @@ class Calculator:
             except Exception as ex:
                 self._message = f"Error: cant show plot with error: '{ex}'"
                 log(self._message)
+
+    def show_xy_plot(self, X, Y, **kwargs):
+        """ shows a plot of X vs Y, X and Y can be any iterable, like a list or numpy array """
+        self._message = None
+        try:
+            p = plots.XyPlotContainer(X, Y, **kwargs)
+            p.display_plot()
+        except Exception as ex:
+            self._message = f"Error: cant show plot with error: '{ex}'"
+            log(self._message)
+
 
     def user_entry(self, user_input: any):
         """ Parses the user input string and performs the appropriate action. This method is the primary interface

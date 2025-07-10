@@ -9,6 +9,7 @@ import struct
 
 from calc import Calculator
 import engnum
+import plots
 
 from copy import copy
 from struct import pack
@@ -163,6 +164,8 @@ class MainWindow:
         self._menu_bar.add_cascade(label='View', menu=self._view_menu)
         self._options_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='Options', menu=self._options_menu)
+        self._plot_menu = tk.Menu(self._menu_bar)
+        self._menu_bar.add_cascade(label='Plot', menu=self._plot_menu)
 
         # FILE MENU ........................
 
@@ -260,6 +263,12 @@ class MainWindow:
 
         # add option to open the 'function buttons' popup
         self._options_menu.add_command(label='Function buttons', command=self.popup_function_buttons)
+
+        # PLOT MENU ............................
+
+        self._plot_menu.add_command(label='Plot', command=self.show_plot)
+        self._plot_menu.add_command(label='XY Plot', command=self.show_xy_plot_popup)
+        self._plot_menu.add_command(label='XYZ Plot', command=self.show_xyz_plot_popup)
 
         # MENU BINDINGS ........................
 
@@ -371,7 +380,6 @@ class MainWindow:
         log(f"Stack Table column width: {self._stack_table.column('value', 'width')}")
 
     """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
-
 
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
@@ -1088,6 +1096,59 @@ class MainWindow:
         self._update_message_display()
         self._update_stack_display()
         self._update_locals_display()
+
+    def show_xyz_plot_popup(self):
+        pass
+
+    def show_xy_plot_popup(self):
+        """ opens a popup window to show the xy plot options """
+
+        def apply_plot_options():
+            pass
+            window.destroy()
+
+        def plot_xy():
+            """ applies the plot options and closes the window """
+            x = x_svar.get()
+            y = y_svar.get()
+            locals = self._c.return_locals()
+            X = locals.get(x, None)
+            Y = locals.get(y, None)
+            if X is None or Y is None:
+                self._update_message_display(f"Error: '{x}' or '{y}' not found in locals.")
+                return
+            self._c.show_xy_plot(X, Y)
+            window.destroy()
+
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('XY Plot Options')
+        # make window dimensions 800 by 600
+        window.geometry('250x250')
+
+        # grab all the locals that are lists or arrays
+        locals = self._c.return_locals()
+        local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, ndarray))}
+        local_array_keys = list(local_arrays.keys())
+
+
+        x_svar = tk.StringVar(window)
+        x_svar.set(local_array_keys[0])  # set default value to the first key
+        x = tk.OptionMenu(window, x_svar, *local_array_keys)
+        x.pack()
+
+        y_svar = tk.StringVar(window)
+        y_svar.set(local_array_keys[0])
+        y = tk.OptionMenu(window, y_svar, *local_array_keys)
+        y.pack()
+
+
+        # create a button to save the changes
+        ttk.Button(window, text='Plot', command=plot_xy).pack()
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
 
     def paste(self, value):
         """ handles pasting from the clipboard """
