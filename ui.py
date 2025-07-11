@@ -1117,37 +1117,115 @@ class MainWindow:
             if X is None or Y is None:
                 self._update_message_display(f"Error: '{x}' or '{y}' not found in locals.")
                 return
-            self._c.show_xy_plot(X, Y)
-            window.destroy()
+
+            self._c.show_xy_plot(X, Y,
+                                 name=plot_label.get(),
+                                 color=color_svar.get(),
+                                 line_style=line_style_svar.get(),
+                                 marker=marker_svar.get(),
+                                 linewidth=2,
+                                 markersize=3,
+                                 alpha=1.0,
+                                 grid=grid_svar.get(),
+                                 xlabel=x_svar.get(),
+                                 ylabel=y_svar.get(),
+
+                                 )
 
         # create a new window
         window = tk.Toplevel(self._root)
         window.title('XY Plot Options')
         # make window dimensions 800 by 600
-        window.geometry('250x250')
+        window.geometry('400x400')
+
+        # crete grid manager for the popup
+        window.grid_rowconfigure(0, weight=1)
+        window.grid_columnconfigure(0, weight=1)
+        window.grid_propagate(False)  # prevent the window from resizing to fit the content
+        # create a label to ask the user to select the x and y variables
+
+        row = 0
+        ttk.Label(window, text='Define the plot parameters').grid(row=row, column=0, padx=5, pady=10)
 
         # grab all the locals that are lists or arrays
         locals = self._c.return_locals()
         local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, ndarray))}
         local_array_keys = list(local_arrays.keys())
 
-
+        row = 1
         x_svar = tk.StringVar(window)
         x_svar.set(local_array_keys[0])  # set default value to the first key
         x = tk.OptionMenu(window, x_svar, *local_array_keys)
-        x.pack()
+        x.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+        ttk.Label(window, text='Select X').grid(row=row, column=1, padx=10, pady=4, sticky='w')
 
+        row = 2
         y_svar = tk.StringVar(window)
         y_svar.set(local_array_keys[0])
         y = tk.OptionMenu(window, y_svar, *local_array_keys)
-        y.pack()
+        y.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+        ttk.Label(window, text='Select Y').grid(row=row, column=1, padx=10, pady=4, sticky='w')
 
 
+        row = 3 # create text entry for trace label
+        ttk.Label(window, text='Trace Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        trace_label = ttk.Entry(window)
+        trace_label.insert(0, 'Trace 1')
+        trace_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+        row = 4 # create a text field for the plot label
+        ttk.Label(window, text='Plot Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        plot_label = ttk.Entry(window)
+        plot_label.insert(0, 'XY Plot')
+        plot_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+        row = 6 # create a option menu to select the plot color
+        ttk.Label(window, text='Plot Color').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        color_options = ['blue', 'red', 'green', 'black', 'orange', 'purple', 'brown']
+        color_svar = tk.StringVar(window)
+        color_svar.set(color_options[0])  # set default value to the first option
+        color_menu = tk.OptionMenu(window, color_svar, *color_options)
+        color_menu.grid(row=row, column=0, padx=10, pady=4, sticky='e')
+
+        row = 7 # create an option menu to select the plot style
+        ttk.Label(window, text='Plot Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        style_options = ['line', 'scatter', 'bar', 'step']
+        style_svar = tk.StringVar(window)
+        style_svar.set(style_options[0])  # set default value to the first option
+        style_menu = tk.OptionMenu(window, style_svar, *style_options)
+        style_menu.grid(row=row, column=0, padx=10, pady=4, sticky='e')
+
+        row = 8 # create an option menu to select the plot marker
+        ttk.Label(window, text='Plot Marker').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        marker_options = ['o', '', 'x', 's', '^', 'd', '*']
+        marker_svar = tk.StringVar(window)
+        marker_svar.set(marker_options[0])  # set default value to the first option
+        marker_menu = tk.OptionMenu(window, marker_svar, *marker_options)
+        marker_menu.grid(row=row, column=0, padx=10, pady=4,sticky='e')
+
+        row = 9 # create an option menu to select the plot line style
+        ttk.Label(window, text='Plot Line Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        line_style_options = ['-', '', '--', '-.', ':']
+        line_style_svar = tk.StringVar(window)
+        line_style_svar.set(line_style_options[0])  # set default value to the
+        # first option
+        line_style_menu = tk.OptionMenu(window, line_style_svar, *line_style_options)
+        line_style_menu.grid(row=row, column=0, padx=10, pady=4,sticky='e')
+
+        row = 10 # create a button to select grid on/off
+        ttk.Label(window, text='Grid').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        grid_svar = tk.BooleanVar(window, value=True)  # default to True
+        grid_check = ttk.Checkbutton(window, variable=grid_svar, onvalue=True, offvalue=False)
+        grid_check.grid(row=row, column=0, padx=10, pady=4, sticky='e')
+
+
+        row = 11
         # create a button to save the changes
-        ttk.Button(window, text='Plot', command=plot_xy).pack()
+        ttk.Button(window, text='Plot', command=plot_xy).grid(row=row, column=0, padx=10, pady=10, sticky='w')
+
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10, sticky='e')
 
 
     def paste(self, value):

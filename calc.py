@@ -419,11 +419,37 @@ class Calculator:
                 self._message = f"Error: cant show plot with error: '{ex}'"
                 log(self._message)
 
-    def show_xy_plot(self, X, Y, **kwargs):
+    def show_xy_plot(self,
+                         x_data: list | np.ndarray,
+                         y_data: list | np.ndarray,
+                         name="X-Y Plot",
+                         color="blue",
+                         line_style="-",
+                         marker="o",
+                         linewidth=2,
+                         markersize=6,
+                         alpha=1.0,
+                         grid=True,
+                         xlabel="X-axis",
+                         ylabel="Y-axis",
+                         ):
         """ shows a plot of X vs Y, X and Y can be any iterable, like a list or numpy array """
         self._message = None
         try:
-            p = plots.XyPlotContainer(X, Y, **kwargs)
+            p = plots.XyPlotContainer(
+                                        x_data,
+                                        y_data,
+                                        name=name,
+                                        color=color,
+                                        line_style=line_style,
+                                        marker=marker,
+                                        linewidth=linewidth,
+                                        markersize=markersize,
+                                        alpha=alpha,
+                                        grid=grid,
+                                        xlabel=xlabel,
+                                        ylabel=ylabel,
+                                        )
             p.display_plot()
         except Exception as ex:
             self._message = f"Error: cant show plot with error: '{ex}'"

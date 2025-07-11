@@ -48,7 +48,9 @@ class PlotContainer:
         plt.show()
 
 class XyPlotContainer(PlotContainer):
-    def __init__(self, x_data: list | np.ndarray, y_data: list | np.ndarray,
+    def __init__(self,
+                 x_data: list | np.ndarray,
+                 y_data: list | np.ndarray,
                  name="X-Y Plot",
                  color="blue",
                  line_style="-",
@@ -58,7 +60,7 @@ class XyPlotContainer(PlotContainer):
                  alpha=1.0,
                  grid=True,
                  xlabel="X-axis",
-                 ylabel="Y-axis"
+                 ylabel="Y-axis",
                  ):
         """ Initializes the X-Y plot container with x and y data. """
         super().__init__(y_data, name, color, line_style, marker, linewidth, markersize, alpha, grid, xlabel, ylabel)
