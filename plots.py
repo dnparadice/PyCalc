@@ -28,24 +28,22 @@ class PlotContainer:
         self.ylabel = ylabel
         self.data = self.y_data
 
-    def display_plot(self):
+    def display_plot(self, plot_obj: plt, name):
         Y = self.y_data
         X = np.arange(len(Y))
-        plt.plot(X, Y,
+        plot_obj.plot(X, Y,
                  color=self.color,
                  linestyle=self.line_style,
                  marker=self.marker,
                  linewidth=self.linewidth,
                  markersize=self.markersize,
                  alpha=self.alpha,
-                 label=self.name)
-        plt.xlabel(self.xlabel)
-        plt.ylabel(self.ylabel)
-        plt.title(self.name)
+                 label=name)
+        plot_obj.xlabel(self.xlabel)
+        plot_obj.ylabel(self.ylabel)
+        plot_obj.title(self.name)
         if self.grid:
             plt.grid(True)
-        plt.legend()
-        plt.show()
 
 class XyPlotContainer(PlotContainer):
     def __init__(self,
@@ -66,20 +64,19 @@ class XyPlotContainer(PlotContainer):
         super().__init__(y_data, name, color, line_style, marker, linewidth, markersize, alpha, grid, xlabel, ylabel)
         self.x_data = np.array(x_data)
 
-    def display_plot(self):
-        plt.plot(self.x_data, self.y_data,
+    def display_plot(self, plot_obj: plt, name):
+        plot_obj.plot(self.x_data, self.y_data,
                  color=self.color,
                  linestyle=self.line_style,
                  marker=self.marker,
                  linewidth=self.linewidth,
                  markersize=self.markersize,
                  alpha=self.alpha,
-                 label=self.name)
-        plt.xlabel(self.xlabel)
-        plt.ylabel(self.ylabel)
-        plt.title(self.name)
+                 label=name)
+        plot_obj.xlabel(self.xlabel)
+        plot_obj.ylabel(self.ylabel)
+        plot_obj.title(self.name)
         if self.grid:
-            plt.grid(True)
-        plt.legend()
-        plt.show()
+            plot_obj.grid(True)
+
 

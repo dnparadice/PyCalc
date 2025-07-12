@@ -416,43 +416,23 @@ class Calculator:
                 plt.show()
                 self._message = f"Plot shown"
             except Exception as ex:
-                self._message = f"Error: cant show plot with error: '{ex}'"
+                self._message = f"Error: show_plot() cant show plot with error: '{ex}'"
                 log(self._message)
 
-    def show_xy_plot(self,
-                         x_data: list | np.ndarray,
-                         y_data: list | np.ndarray,
-                         name="X-Y Plot",
-                         color="blue",
-                         line_style="-",
-                         marker="o",
-                         linewidth=2,
-                         markersize=6,
-                         alpha=1.0,
-                         grid=True,
-                         xlabel="X-axis",
-                         ylabel="Y-axis",
-                         ):
-        """ shows a plot of X vs Y, X and Y can be any iterable, like a list or numpy array """
+    def show_plots_dict(self, plots: dict):
+        """ shows a plot of X vs Y, X and Y can be any iterable, like a list or numpy array:
+         :param plots: [dict] of plot objects like {<trace name>: <plots.PlotContainer>, ...}"""
         self._message = None
         try:
-            p = plots.XyPlotContainer(
-                                        x_data,
-                                        y_data,
-                                        name=name,
-                                        color=color,
-                                        line_style=line_style,
-                                        marker=marker,
-                                        linewidth=linewidth,
-                                        markersize=markersize,
-                                        alpha=alpha,
-                                        grid=grid,
-                                        xlabel=xlabel,
-                                        ylabel=ylabel,
-                                        )
-            p.display_plot()
+            plot_lib = plt
+            for name, p in plots.items():
+                p.display_plot(plot_lib, name)
+
+            plot_lib.legend()
+            plot_lib.show()
+
         except Exception as ex:
-            self._message = f"Error: cant show plot with error: '{ex}'"
+            self._message = f"Error: show_plots_dict() cant show plot with error: '{ex}'"
             log(self._message)
 
 

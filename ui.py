@@ -547,9 +547,10 @@ class MainWindow:
         selected = self._locals_table.selection()
         if len(selected) == 0:
             return
-        key = self._locals_table.item(selected)['text']
-        value = self._locals_table.item(selected)['values'][0]
-        self._c.delete_local(key)
+        for item in selected:
+            key = self._locals_table.item(item)['text']
+            value = self._locals_table.item(item)['values'][0]
+            self._c.delete_local(key)
         self._update_locals_display()
         self._update_message_display()
 
@@ -912,7 +913,9 @@ class MainWindow:
         func_dict = self._c.return_user_functions_for_display()
         for key, value in func_dict.items():
             entry.insert('end', f"Name: '{key}':\n{value}____________________________________________\n")
-        entry.pack()
+
+        # let the text area expand with the window
+        entry.pack(expand=True, fill='both')
 
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).pack()
@@ -943,7 +946,7 @@ class MainWindow:
         scroll.pack(side='right', fill='y')
         entry.config(yscrollcommand=scroll.set)
         scroll.config(command=entry.yview)
-        entry.pack()
+        entry.pack(expand=True, fill='both')
 
         # add a numeric filed at the bottom of the window that shows the number of functions
         ttk.Label(window, text=f"Number of functions: {len(func_dict)}").pack()
@@ -1103,9 +1106,14 @@ class MainWindow:
     def show_xy_plot_popup(self):
         """ opens a popup window to show the xy plot options """
 
+        plots_dict = dict()
+
         def apply_plot_options():
             pass
             window.destroy()
+
+        def clear_plots():
+            plots_dict.clear()
 
         def plot_xy():
             """ applies the plot options and closes the window """
@@ -1118,19 +1126,22 @@ class MainWindow:
                 self._update_message_display(f"Error: '{x}' or '{y}' not found in locals.")
                 return
 
-            self._c.show_xy_plot(X, Y,
-                                 name=plot_label.get(),
-                                 color=color_svar.get(),
-                                 line_style=line_style_svar.get(),
-                                 marker=marker_svar.get(),
-                                 linewidth=2,
-                                 markersize=3,
-                                 alpha=1.0,
-                                 grid=grid_svar.get(),
-                                 xlabel=x_svar.get(),
-                                 ylabel=y_svar.get(),
+            new_plot = plots.XyPlotContainer(X,
+                                  Y,
+                                  name=plot_label.get(),
+                                  color=color_svar.get(),
+                                  line_style=line_style_svar.get(),
+                                  marker=marker_svar.get(),
+                                  linewidth=2,
+                                  markersize=3,
+                                  alpha=1.0,
+                                  grid=grid_svar.get(),
+                                  xlabel=x_svar.get(),
+                                  ylabel=y_svar.get(),)
 
-                                 )
+            plots_dict.update({trace_label.get(): new_plot})
+            self._c.show_plots_dict(plots_dict)
+            self._update_message_display()
 
         # create a new window
         window = tk.Toplevel(self._root)
@@ -1218,10 +1229,13 @@ class MainWindow:
         grid_check = ttk.Checkbutton(window, variable=grid_svar, onvalue=True, offvalue=False)
         grid_check.grid(row=row, column=0, padx=10, pady=4, sticky='e')
 
+        row=10
+        ttk.Button(window, text='Add Plot', command=plot_xy).grid(row=row, column=0, padx=10, pady=10, sticky='w')
+
 
         row = 11
         # create a button to save the changes
-        ttk.Button(window, text='Plot', command=plot_xy).grid(row=row, column=0, padx=10, pady=10, sticky='w')
+        ttk.Button(window, text='Clear Plots', command=clear_plots).grid(row=row, column=0, padx=10, pady=10, sticky='w')
 
 
         # create a button to cancel the changes
