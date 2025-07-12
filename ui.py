@@ -486,8 +486,19 @@ class MainWindow:
         if len(selected) == 0:
             return
         key = self._locals_table.item(selected)['text']
-        value = self._locals_table.item(selected)['values'][0]
+
+        # this does not work because the value returned is a string so for a list you get [1 2 3] instead of [1, 2, 3] as expected
+        # need to grab the actual value from the calculator locals using the key
+        # value = self._locals_table.item(selected)['values'][0]
+
+        locals = self._c.return_locals() # type: dict
+        value = locals.get(key, None)
+        if value is None:
+            self._update_message_display(f"Variable '{key}' not found in locals.")
+            return
         self._c.user_entry(value)
+        self._c.enter_press()
+
         self._update_stack_display()
         self._update_message_display(f"Inserted value at x: {key}={value}")
 
