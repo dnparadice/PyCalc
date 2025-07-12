@@ -461,7 +461,7 @@ class MainWindow:
         # add a line seperator to the menu
         right_click_menu.add_separator()
         # add item: "remove selected item"
-        right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
+        right_click_menu.add_command(label='Remove selected items', command=self._remove_selected_item_from_locals_table)
         right_click_menu.post(event.x_root, event.y_root)
 
     def _right_click_menu_stack_table(self, event):
@@ -487,9 +487,9 @@ class MainWindow:
             return
         key = self._locals_table.item(selected)['text']
 
+        # value = self._locals_table.item(selected)['values'][0]
         # this does not work because the value returned is a string so for a list you get [1 2 3] instead of [1, 2, 3] as expected
         # need to grab the actual value from the calculator locals using the key
-        # value = self._locals_table.item(selected)['values'][0]
 
         locals = self._c.return_locals() # type: dict
         value = locals.get(key, None)
