@@ -1224,14 +1224,15 @@ class Calculator:
         self._stack = []
 
     def clear_user_functions(self, function_name=None):
-        """ removes the user functions from the namespace and the user functions set """
+        """ removes the user functions from the namespace and the user functions set, if function_name is None
+        all functions will be removed"""
         if function_name is None:
             to_remove = copy(list(self._user_functions.keys()))
         else:
             to_remove = {function_name}
         for func in to_remove:
             try:
-                self._user_functions.pop(func)
+                self._user_functions.pop(func, None)
                 self._exec_globals.pop(func, None)
                 del func
             except Exception as ex:

@@ -252,8 +252,7 @@ class MainWindow:
 
         # add an option to open the add function popup window that calls the method popup_add_function
         self._options_menu.add_command(label='Add function', command=self.popup_add_function)
-
-        # add an option to 'remove user function' that calls the method remove_user_function
+        self._options_menu.add_command(label='Edit function', command=self.popup_edit_user_function)
         self._options_menu.add_command(label='Remove function', command=self.popup_remove_user_function)
 
         # add an option to 'clear all user functions' that calls the method clear_all_user_functions
@@ -859,7 +858,7 @@ class MainWindow:
         list_box = tk.Listbox(window, height=10, width=50)
         for key in self._c.return_user_functions().keys():
             list_box.insert('end', key)
-        list_box.pack()
+        list_box.pack(expand=True, fill='both')
 
         def remove_user_function():
             selected = list_box.curselection()
@@ -874,6 +873,82 @@ class MainWindow:
 
         # create a button to cancel the remove function
         ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+    def popup_edit_user_function(self):
+        """opens a popup window that has a list of functions thhat when clicked displayes the function in a text field"""
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Edit User Function')
+
+        # create a list box to show the user functions
+        list_box = tk.Listbox(window, height=10, width=50)
+        for key in self._c.return_user_functions().keys():
+            list_box.insert('end', key)
+        list_box.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # create a text filed to display the selected function
+        function_field = tk.Text(window, height=25, width=50)
+        function_field.pack(expand=True, fill='both', padx=5, pady=5)
+
+        def update_list_box(_in=None):
+
+            current_selection = list_box.curselection()
+
+            list_box.delete(0, 'end')
+            for key in self._c.return_user_functions().keys():
+                list_box.insert('end', key)
+
+            # set to previous current selection
+            if current_selection:
+                list_box.selection_set(current_selection)
+                show_function()
+
+
+        def show_function(_in=None):
+            selected = list_box.curselection()
+            if len(selected) == 0:
+                return
+            key = list_box.get(selected)
+            function_string = self._c.return_user_functions().get(key, '')
+            function_field.delete('1.0', tk.END)
+            function_field.insert('end', function_string)
+
+        def save_changes():
+            """ saves the changes made to the function """
+            try:
+                selected = list_box.curselection()
+                if len(selected) == 0:
+                    return
+                func_str = function_field.get('1.0', tk.END)
+                self._c.add_user_function(func_str)
+            except Exception as ex: # open a popup with the exception
+                message = f"Exception saving function: {ex}"
+                # open a simple text popup displaying the message
+                popup = tk.Toplevel(self._root)
+                popup.title('Warning')
+                label = ttk.Label(popup, text=message)
+                label.pack(padx=5, pady=5)
+                ttk.Button(popup, text='OK', command=popup.destroy).pack(padx=5, pady=5)
+
+
+
+        def add_function():
+            """ opens a popup to add a function """
+            self.popup_add_function()
+            # clear the list box
+            list_box.delete(0, 'end')
+            update_list_box()
+
+        # selecting the listbox in any way shows the function
+        list_box.bind('<Double-1>', update_list_box)
+        list_box.bind('<Button-1>', update_list_box)
+        list_box.bind('<<ListboxSelect>>', update_list_box)
+
+        # add some buttons
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Add Functon', command=add_function).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Save Changes', command=save_changes).pack(side='left', padx=5, pady=5)
+
 
     def popup_add_function(self, function_string=None, parent_object=None):
         """ opens a popup window to add a function to the calculator """
@@ -894,7 +969,9 @@ class MainWindow:
         else:
             entry.insert('1.0', function_string)
         entry.focus()
-        entry.pack()
+
+        # let the text area expand with the window
+        entry.pack(expand=True, fill='both')
 
         def apply_function():
             function_string = entry.get('1.0', 'end')
@@ -907,8 +984,9 @@ class MainWindow:
                 self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
                 window.destroy()
 
-        # create a button to save the changes
+        # create a button to save the changes, bind the enter press to the ok button function
         ttk.Button(window, text='OK', command=apply_function).pack()
+        entry.bind('<Return>', lambda event: apply_function())
 
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).pack()
