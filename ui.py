@@ -548,9 +548,13 @@ class MainWindow:
 
         # create a button to save the changes
         ttk.Button(window, text='OK', command=apply_value).pack()
+        # bind enter press to apply_value
+        entry.bind('<Return>', lambda event: apply_value())
 
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+        entry.focus()
 
     def _remove_selected_item_from_locals_table(self):
         """ removes the selected item from the locals table """
@@ -588,6 +592,7 @@ class MainWindow:
         entry.insert(0, value)
         entry.pack(expand=True, fill='x')
 
+
         def apply_value():
             new_value = entry.get()
             # self._c.user_entry(f"{key}={new_value}")
@@ -608,6 +613,10 @@ class MainWindow:
 
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).pack()
+
+        # set focus to entry
+        entry.focus()
+
 
     def _set_visibility_buttons(self, state: bool):
         """ sets the visibility of the buttons based on the state """
