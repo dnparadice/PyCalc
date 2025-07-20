@@ -266,8 +266,8 @@ class MainWindow:
         # PLOT MENU ............................
 
         self._plot_menu.add_command(label='Plot', command=self.show_plot)
-        self._plot_menu.add_command(label='XY Plot', command=self.show_xy_plot_popup)
-        self._plot_menu.add_command(label='XYZ Plot', command=self.show_xyz_plot_popup)
+        self._plot_menu.add_command(label='XY Plot', command=self.popup_xy_plot)
+        self._plot_menu.add_command(label='XYZ Plot', command=self.popup_xyz_plot)
 
         # MENU BINDINGS ........................
 
@@ -1198,25 +1198,23 @@ class MainWindow:
         self._update_stack_display()
         self._update_locals_display()
 
-    def show_xyz_plot_popup(self):
-        pass
-
-    def show_xy_plot_popup(self):
+    def popup_xy_plot(self):
         """ opens a popup window to show the xy plot options """
 
         plots_dict = dict()
+        len_str = ' ('
 
-        def apply_plot_options():
-            pass
-            window.destroy()
+        def get_trace_key_from_svar(svar: tk.StringVar):
+            """ returns the trace key from the StringVar """
+            return svar.get().split(len_str)[0].strip()
 
         def clear_plots():
             plots_dict.clear()
 
         def plot_xy():
             """ applies the plot options and closes the window """
-            x = x_svar.get()
-            y = y_svar.get()
+            x = get_trace_key_from_svar(x_svar)
+            y = get_trace_key_from_svar(y_svar)
             locals = self._c.return_locals()
             X = locals.get(x, None)
             Y = locals.get(y, None)
@@ -1234,8 +1232,8 @@ class MainWindow:
                                   markersize=3,
                                   alpha=1.0,
                                   grid=grid_svar.get(),
-                                  xlabel=x_svar.get(),
-                                  ylabel=y_svar.get(),)
+                                  xlabel=get_trace_key_from_svar(x_svar),
+                                  ylabel=get_trace_key_from_svar(y_svar),)
 
             plots_dict.update({trace_label.get(): new_plot})
             self._c.show_plots_dict(plots_dict)
@@ -1259,7 +1257,7 @@ class MainWindow:
         # grab all the locals that are lists or arrays
         locals = self._c.return_locals()
         local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, ndarray))}
-        local_array_keys = list(local_arrays.keys())
+        local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
 
         row = 1
         x_svar = tk.StringVar(window)
@@ -1296,14 +1294,6 @@ class MainWindow:
         color_menu = tk.OptionMenu(window, color_svar, *color_options)
         color_menu.grid(row=row, column=0, padx=10, pady=4, sticky='e')
 
-        row = 7 # create an option menu to select the plot style
-        ttk.Label(window, text='Plot Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
-        style_options = ['line', 'scatter', 'bar', 'step']
-        style_svar = tk.StringVar(window)
-        style_svar.set(style_options[0])  # set default value to the first option
-        style_menu = tk.OptionMenu(window, style_svar, *style_options)
-        style_menu.grid(row=row, column=0, padx=10, pady=4, sticky='e')
-
         row = 8 # create an option menu to select the plot marker
         ttk.Label(window, text='Plot Marker').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         marker_options = ['o', '', 'x', 's', '^', 'd', '*']
@@ -1338,6 +1328,12 @@ class MainWindow:
 
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10, sticky='e')
+
+    def popup_xyz_plot(self):
+        """ opens a popup window to show the xyz plot options """
+        pass
+
+
 
 
     def paste(self, value):
