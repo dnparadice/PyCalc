@@ -1262,15 +1262,15 @@ class MainWindow:
         row = 1
         x_svar = tk.StringVar(window)
         x_svar.set(local_array_keys[0])  # set default value to the first key
-        x = tk.OptionMenu(window, x_svar, *local_array_keys)
-        x.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+        x_combo = ttk.Combobox(window, values=local_array_keys, textvariable=x_svar)
+        x_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
         ttk.Label(window, text='Select X').grid(row=row, column=1, padx=10, pady=4, sticky='w')
 
         row = 2
         y_svar = tk.StringVar(window)
         y_svar.set(local_array_keys[0])
-        y = tk.OptionMenu(window, y_svar, *local_array_keys)
-        y.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+        y_combo = ttk.Combobox(window, values=local_array_keys, textvariable=y_svar)
+        y_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
         ttk.Label(window, text='Select Y').grid(row=row, column=1, padx=10, pady=4, sticky='w')
 
 
@@ -1291,25 +1291,24 @@ class MainWindow:
         color_options = ['blue', 'red', 'green', 'black', 'orange', 'purple', 'brown']
         color_svar = tk.StringVar(window)
         color_svar.set(color_options[0])  # set default value to the first option
-        color_menu = tk.OptionMenu(window, color_svar, *color_options)
-        color_menu.grid(row=row, column=0, padx=10, pady=4, sticky='e')
+        color_combo = ttk.Combobox(window, values=color_options, textvariable=color_svar)
+        color_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
         row = 8 # create an option menu to select the plot marker
         ttk.Label(window, text='Plot Marker').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         marker_options = ['o', '', 'x', 's', '^', 'd', '*']
         marker_svar = tk.StringVar(window)
         marker_svar.set(marker_options[0])  # set default value to the first option
-        marker_menu = tk.OptionMenu(window, marker_svar, *marker_options)
-        marker_menu.grid(row=row, column=0, padx=10, pady=4,sticky='e')
+        marker_combo = ttk.Combobox(window, values=marker_options, textvariable=marker_svar)
+        marker_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
         row = 9 # create an option menu to select the plot line style
         ttk.Label(window, text='Plot Line Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         line_style_options = ['-', '', '--', '-.', ':']
         line_style_svar = tk.StringVar(window)
         line_style_svar.set(line_style_options[0])  # set default value to the
-        # first option
-        line_style_menu = tk.OptionMenu(window, line_style_svar, *line_style_options)
-        line_style_menu.grid(row=row, column=0, padx=10, pady=4,sticky='e')
+        line_style_combo = ttk.Combobox(window, values=line_style_options, textvariable=line_style_svar)
+        line_style_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
         row = 10 # create a button to select grid on/off
         ttk.Label(window, text='Grid').grid(row=row, column=1, padx=10, pady=4, sticky='w')
