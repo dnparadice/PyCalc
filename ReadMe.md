@@ -5,7 +5,6 @@
 
 
 _______________________
-<img src="media/PyCalc_UserFunctions_DarkMode.jpg" alt="calculator and user functions" width="800" height="auto">
 
 This is the best calculator you will ever use because it packs the ecosystem of Python 
 into a fast and familiar User Interface. 
@@ -142,7 +141,7 @@ Note: you can copy values in Excel or Google Sheets and paste them directly into
 will convert the pasted section to a list and display it on the stack. 
 </span>.
 
-#### Plotting
+####  Basic Plotting
 
 The Calculator uses the awesome Matplotlib library to plot data. 
 
@@ -154,9 +153,20 @@ The Calculator uses the awesome Matplotlib library to plot data.
 Note: You can copy rows and columns in Excel or Google Sheets and paste them directly into the calculator.
 </span>.
 
-![PyCalc](media/PyCalc-PlotExampleA.jpg)
+<img src="media/PyCalc-PlotExampleA.jpg" alt="calculator and plot" width="700" height="auto">
 
-#### advanced plotting
+#### Even Better Plotting
+
+You can define custom Y, XY, and XYZ plots from the plot menu. After defining list or array variables in the calculator
+you will see them 
+in the dropdown menu on the plot popups. The length of the list or array will be displayed next to the variable name in 
+parentheses. Selecting X and Y variables of the same length will plot the Y variable against the X variable. You can add
+multiple plots to the same graph by selecting the 'Add Plot' button. Note that each plot must have a unique trace name
+to plot a seperate plot, othewise the existing plot (wiht the trace name) will be overwritten.
+
+<img src="media/PyCalc XY plot popup 20250731.jpg" alt="calculator and plot" width="800" height="auto">
+
+#### Advanced Plotting
 
 You can interact directly with the plot library like so: 
 1) enter: *np.linspace(0, 10, 100)*
