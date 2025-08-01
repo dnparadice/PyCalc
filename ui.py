@@ -265,7 +265,7 @@ class MainWindow:
 
         # PLOT MENU ............................
 
-        self._plot_menu.add_command(label='Plot', command=self.show_plot)
+        self._plot_menu.add_command(label='Plot', command=self.popup_x_plot)
         self._plot_menu.add_command(label='XY Plot', command=self.popup_xy_plot)
         self._plot_menu.add_command(label='XYZ Plot', command=self.popup_xyz_plot)
 
@@ -1198,9 +1198,8 @@ class MainWindow:
         self._update_stack_display()
         self._update_locals_display()
 
-    def popup_xy_plot(self):
-        """ opens a popup window to show the xy plot options """
-
+    def popup_x_plot(self):
+        """ applies the plot options and closes the window """
         plots_dict = dict()
         len_str = ' ('
 
@@ -1211,15 +1210,15 @@ class MainWindow:
         def clear_plots():
             plots_dict.clear()
 
-        def plot_xy():
+
+        def plot_y():
             """ applies the plot options and closes the window """
-            x = get_trace_key_from_svar(x_svar)
             y = get_trace_key_from_svar(y_svar)
             locals = self._c.return_locals()
-            X = locals.get(x, None)
             Y = locals.get(y, None)
+            X = list(range(len(Y)))
             if X is None or Y is None:
-                self._update_message_display(f"Error: '{x}' or '{y}' not found in locals.")
+                self._update_message_display(f"Error: '{y}' not found in locals.")
                 return
 
             new_plot = plots.XyPlotContainer(X,
@@ -1232,7 +1231,7 @@ class MainWindow:
                                   markersize=3,
                                   alpha=1.0,
                                   grid=grid_svar.get(),
-                                  xlabel=get_trace_key_from_svar(x_svar),
+                                  xlabel='data points',
                                   ylabel=get_trace_key_from_svar(y_svar),)
 
             plots_dict.update({trace_label.get(): new_plot})
@@ -1240,8 +1239,9 @@ class MainWindow:
             self._update_message_display()
 
         # create a new window
+
         window = tk.Toplevel(self._root)
-        window.title('XY Plot Options')
+        window.title('Y Plot Options')
         # make window dimensions 800 by 600
         window.geometry('400x400')
 
@@ -1260,11 +1260,11 @@ class MainWindow:
         local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
 
         row = 1
-        x_svar = tk.StringVar(window)
-        x_svar.set(local_array_keys[0])  # set default value to the first key
-        x_combo = ttk.Combobox(window, values=local_array_keys, textvariable=x_svar)
-        x_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
-        ttk.Label(window, text='Select X').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        # x_svar = tk.StringVar(window)
+        # x_svar.set(local_array_keys[0])  # set default value to the first key
+        # x_combo = ttk.Combobox(window, values=local_array_keys, textvariable=x_svar)
+        # x_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+        ttk.Label(window, text='The X values are 0 to len(Y)').grid(row=row, column=1, padx=10, pady=4, sticky='w')
 
         row = 2
         y_svar = tk.StringVar(window)
@@ -1273,20 +1273,19 @@ class MainWindow:
         y_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
         ttk.Label(window, text='Select Y').grid(row=row, column=1, padx=10, pady=4, sticky='w')
 
-
-        row = 3 # create text entry for trace label
+        row = 3  # create text entry for trace label
         ttk.Label(window, text='Trace Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         trace_label = ttk.Entry(window)
         trace_label.insert(0, 'Trace 1')
         trace_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
-        row = 4 # create a text field for the plot label
+        row = 4  # create a text field for the plot label
         ttk.Label(window, text='Plot Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         plot_label = ttk.Entry(window)
-        plot_label.insert(0, 'XY Plot')
+        plot_label.insert(0, 'Y Plot')
         plot_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
-        row = 6 # create a option menu to select the plot color
+        row = 6  # create a option menu to select the plot color
         ttk.Label(window, text='Plot Color').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         color_options = ['blue', 'red', 'green', 'black', 'orange', 'purple', 'brown']
         color_svar = tk.StringVar(window)
@@ -1294,7 +1293,7 @@ class MainWindow:
         color_combo = ttk.Combobox(window, values=color_options, textvariable=color_svar)
         color_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
-        row = 8 # create an option menu to select the plot marker
+        row = 8  # create an option menu to select the plot marker
         ttk.Label(window, text='Plot Marker').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         marker_options = ['o', '', 'x', 's', '^', 'd', '*']
         marker_svar = tk.StringVar(window)
@@ -1302,7 +1301,7 @@ class MainWindow:
         marker_combo = ttk.Combobox(window, values=marker_options, textvariable=marker_svar)
         marker_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
-        row = 9 # create an option menu to select the plot line style
+        row = 9  # create an option menu to select the plot line style
         ttk.Label(window, text='Plot Line Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         line_style_options = ['-', '', '--', '-.', ':']
         line_style_svar = tk.StringVar(window)
@@ -1310,30 +1309,154 @@ class MainWindow:
         line_style_combo = ttk.Combobox(window, values=line_style_options, textvariable=line_style_svar)
         line_style_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
 
-        row = 10 # create a button to select grid on/off
+        row = 10  # create a button to select grid on/off
         ttk.Label(window, text='Grid').grid(row=row, column=1, padx=10, pady=4, sticky='w')
         grid_svar = tk.BooleanVar(window, value=True)  # default to True
         grid_check = ttk.Checkbutton(window, variable=grid_svar, onvalue=True, offvalue=False)
         grid_check.grid(row=row, column=0, padx=10, pady=4, sticky='e')
 
-        row=10
-        ttk.Button(window, text='Add Plot', command=plot_xy).grid(row=row, column=0, padx=10, pady=10, sticky='w')
-
+        row = 10
+        ttk.Button(window, text='Add Plot', command=plot_y).grid(row=row, column=0, padx=10, pady=10, sticky='w')
 
         row = 11
         # create a button to save the changes
         ttk.Button(window, text='Clear Plots', command=clear_plots).grid(row=row, column=0, padx=10, pady=10, sticky='w')
 
-
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10, sticky='e')
+
+
+    def popup_xy_plot(self):
+            """ opens a popup window to show the xy plot options """
+
+            plots_dict = dict()
+            len_str = ' ('
+
+            def get_trace_key_from_svar(svar: tk.StringVar):
+                """ returns the trace key from the StringVar """
+                return svar.get().split(len_str)[0].strip()
+
+            def clear_plots():
+                plots_dict.clear()
+
+            def plot_xy():
+                """ applies the plot options and closes the window """
+                x = get_trace_key_from_svar(x_svar)
+                y = get_trace_key_from_svar(y_svar)
+                locals = self._c.return_locals()
+                X = locals.get(x, None)
+                Y = locals.get(y, None)
+                if X is None or Y is None:
+                    self._update_message_display(f"Error: '{x}' or '{y}' not found in locals.")
+                    return
+
+                new_plot = plots.XyPlotContainer(X,
+                                      Y,
+                                      name=plot_label.get(),
+                                      color=color_svar.get(),
+                                      line_style=line_style_svar.get(),
+                                      marker=marker_svar.get(),
+                                      linewidth=2,
+                                      markersize=3,
+                                      alpha=1.0,
+                                      grid=grid_svar.get(),
+                                      xlabel=get_trace_key_from_svar(x_svar),
+                                      ylabel=get_trace_key_from_svar(y_svar),)
+
+                plots_dict.update({trace_label.get(): new_plot})
+                self._c.show_plots_dict(plots_dict)
+                self._update_message_display()
+
+            # create a new window
+            window = tk.Toplevel(self._root)
+            window.title('XY Plot Options')
+            # make window dimensions 800 by 600
+            window.geometry('400x400')
+
+            # crete grid manager for the popup
+            window.grid_rowconfigure(0, weight=1)
+            window.grid_columnconfigure(0, weight=1)
+            window.grid_propagate(False)  # prevent the window from resizing to fit the content
+            # create a label to ask the user to select the x and y variables
+
+            row = 0
+            ttk.Label(window, text='Define the plot parameters').grid(row=row, column=0, padx=5, pady=10)
+
+            # grab all the locals that are lists or arrays
+            locals = self._c.return_locals()
+            local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, ndarray))}
+            local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
+
+            row = 1
+            x_svar = tk.StringVar(window)
+            x_svar.set(local_array_keys[0])  # set default value to the first key
+            x_combo = ttk.Combobox(window, values=local_array_keys, textvariable=x_svar)
+            x_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+            ttk.Label(window, text='Select X').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+            row = 2
+            y_svar = tk.StringVar(window)
+            y_svar.set(local_array_keys[0])
+            y_combo = ttk.Combobox(window, values=local_array_keys, textvariable=y_svar)
+            y_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+            ttk.Label(window, text='Select Y').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+
+            row = 3 # create text entry for trace label
+            ttk.Label(window, text='Trace Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+            trace_label = ttk.Entry(window)
+            trace_label.insert(0, 'Trace 1')
+            trace_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+            row = 4 # create a text field for the plot label
+            ttk.Label(window, text='Plot Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+            plot_label = ttk.Entry(window)
+            plot_label.insert(0, 'XY Plot')
+            plot_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+            row = 6 # create a option menu to select the plot color
+            ttk.Label(window, text='Plot Color').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+            color_options = ['blue', 'red', 'green', 'black', 'orange', 'purple', 'brown']
+            color_svar = tk.StringVar(window)
+            color_svar.set(color_options[0])  # set default value to the first option
+            color_combo = ttk.Combobox(window, values=color_options, textvariable=color_svar)
+            color_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+            row = 8 # create an option menu to select the plot marker
+            ttk.Label(window, text='Plot Marker').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+            marker_options = ['o', '', 'x', 's', '^', 'd', '*']
+            marker_svar = tk.StringVar(window)
+            marker_svar.set(marker_options[0])  # set default value to the first option
+            marker_combo = ttk.Combobox(window, values=marker_options, textvariable=marker_svar)
+            marker_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+            row = 9 # create an option menu to select the plot line style
+            ttk.Label(window, text='Plot Line Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+            line_style_options = ['-', '', '--', '-.', ':']
+            line_style_svar = tk.StringVar(window)
+            line_style_svar.set(line_style_options[0])  # set default value to the
+            line_style_combo = ttk.Combobox(window, values=line_style_options, textvariable=line_style_svar)
+            line_style_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+            row = 10 # create a button to select grid on/off
+            ttk.Label(window, text='Grid').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+            grid_svar = tk.BooleanVar(window, value=True)  # default to True
+            grid_check = ttk.Checkbutton(window, variable=grid_svar, onvalue=True, offvalue=False)
+            grid_check.grid(row=row, column=0, padx=10, pady=4, sticky='e')
+
+            row=10
+            ttk.Button(window, text='Add Plot', command=plot_xy).grid(row=row, column=0, padx=10, pady=10, sticky='w')
+
+            row = 11
+            # create a button to save the changes
+            ttk.Button(window, text='Clear Plots', command=clear_plots).grid(row=row, column=0, padx=10, pady=10, sticky='w')
+
+            # create a button to cancel the changes
+            ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10, sticky='e')
 
     def popup_xyz_plot(self):
         """ opens a popup window to show the xyz plot options """
         pass
-
-
-
 
     def paste(self, value):
         """ handles pasting from the clipboard """
