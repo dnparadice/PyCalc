@@ -78,8 +78,8 @@ class CalculatorUiSettings:
         self.last_user_function_edit_name = None
 
         # window size and appearance
-        self.stack_rows = 2
-        self.locals_rows = 10
+        self.stack_rows = 5
+        self.locals_rows = 6
 
         self.locals_width_key = 100
         self.locals_width_value = 160
@@ -97,9 +97,9 @@ class CalculatorUiSettings:
         self.button_font = ('Arial', 12)
 
         self.ui_visible_state = UiVisibleState.STANDARD
-        self.show_message_field = False
-        self.show_locals_table = False
-        self.show_buttons = False
+        self.show_message_field = True
+        self.show_locals_table = True
+        self.show_buttons = True
 
 
 class CalculatorUiState:
