@@ -88,6 +88,7 @@ class CalculatorUiSettings:
         self.stack_value_width = 200
         self.stack_type_width = 50
         self.message_width = 30
+        self.message_height = 5
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
@@ -232,6 +233,13 @@ class MainWindow:
 
         # add a 'Mini View' option to the view menu
         self._view_menu.add_command(label='Mini View', command=self._apply_mini_view)
+
+        # add seperator
+        self._view_menu.add_separator()
+
+        # add option to set ui object height
+        self._view_menu.add_command(label='Set Heights', command=self.popup_set_stack_message_vars_height)
+
 
         # OPTIONS MENU ........................
 
@@ -799,7 +807,10 @@ class MainWindow:
         """ sets the visibility of the message field based on the state """
         if state is True:
             # add a field at the bottom for text messages
-            self._message_field = tk.Text(self._top_frame, state='normal', height=2, font=self._settings.message_font)
+            self._message_field = tk.Text(self._top_frame,
+                                          state='normal',
+                                          height=self._settings.message_height,
+                                          font=self._settings.message_font)
             # set width with settings
             self._message_field.config(width=self._settings.message_width)
             self._message_field.pack(expand=True, fill='x', padx=3)
@@ -958,7 +969,6 @@ class MainWindow:
         ttk.Button(window, text='Add Functon', command=add_function).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Save Changes', command=save_changes).pack(side='left', padx=5, pady=5)
 
-
     def popup_add_function(self, function_string=None, parent_object=None):
         """ opens a popup window to add a function to the calculator """
         # create a new window
@@ -1074,6 +1084,94 @@ class MainWindow:
 
         # create a button to cancel the changes
         ttk.Button(window, text='Close', command=window.destroy).pack()
+
+
+    def popup_set_stack_message_vars_height(self):
+        """ open a popup in which you can set the UiSettings variables for the stack height, the message height and the
+        variables height in the UI """
+        window = tk.Toplevel(self._root)
+        window.title('Set Stack / Message / Locals Heights')
+        window.geometry('320x180')
+        window.resizable(False, False)
+
+        frm = ttk.Frame(window, padding=8)
+        frm.pack(expand=True, fill='both')
+
+        ttk.Label(frm, text='Stack row count:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
+        stack_entry = ttk.Entry(frm, width=8)
+        stack_entry.insert(0, str(self._settings.stack_rows))
+        stack_entry.grid(row=0, column=1, sticky='w', padx=4, pady=4)
+
+        ttk.Label(frm, text='Locals row count:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
+        locals_entry = ttk.Entry(frm, width=8)
+        locals_entry.insert(0, str(self._settings.locals_rows))
+        locals_entry.grid(row=1, column=1, sticky='w', padx=4, pady=4)
+
+        ttk.Label(frm, text='Message row height:').grid(row=2, column=0, sticky='w', padx=4, pady=4)
+        message_entry = ttk.Entry(frm, width=8)
+        message_entry.insert(0, str(self._settings.message_height))
+        message_entry.grid(row=2, column=1, sticky='w', padx=4, pady=4)
+
+        def apply_values():
+            try:
+                new_stack = int(stack_entry.get())
+                new_locals = int(locals_entry.get())
+                new_message = int(message_entry.get())
+                if new_stack < 1 or new_locals < 1 or new_message < 1:
+                    raise ValueError('Values must be >= 1')
+            except Exception as ex:
+                self._update_message_display(f"Invalid value: {ex}")
+                return
+
+            # apply to settings
+            self._settings.stack_rows = new_stack
+            self._settings.locals_rows = new_locals
+            self._settings.message_height = new_message
+
+            # update stack table height (this method will set the Treeview height)
+            try:
+                self._update_visible_ui_object_stack(number_visible_rows=new_stack)
+            except Exception:
+                # fallback: directly set property if UI exists
+                if hasattr(self, '_stack_table'):
+                    self._stack_table['height'] = new_stack
+
+            # recreate locals table if visible
+            if self._settings.show_locals_table:
+                if hasattr(self, '_frame_locals'):
+                    try:
+                        self._frame_locals.destroy()
+                    except Exception:
+                        pass
+                # _set_visibility_locals_table will recreate with the new locals_rows
+                self._set_visibility_locals_table(True, number_of_visible_rows=new_locals)
+
+            # recreate message field if visible
+            if self._settings.show_message_field:
+                if hasattr(self, '_message_field'):
+                    try:
+                        self._message_field.destroy()
+                    except Exception:
+                        pass
+                self._set_visibility_message_field(True)
+
+            # refresh displays
+            self._update_stack_display()
+            self._update_locals_display()
+            self._update_message_display(
+                f"Applied new sizes: stack={new_stack}, locals={new_locals}, message={new_message}")
+
+            window.destroy()
+
+        # Buttons
+        btn_frame = ttk.Frame(frm)
+        btn_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        ttk.Button(btn_frame, text='OK', command=apply_values).pack(side='left', padx=6)
+        ttk.Button(btn_frame, text='Cancel', command=window.destroy).pack(side='left', padx=6)
+
+        # Enter key = apply
+        window.bind('<Return>', lambda e: apply_values())
+        stack_entry.focus()
 
     def _popup_function_button_press(self, function: str):
         """ this method gets bound to the function buttons in the popup window """
@@ -1324,7 +1422,6 @@ class MainWindow:
 
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10, sticky='e')
-
 
     def popup_xy_plot(self):
             """ opens a popup window to show the xy plot options """
