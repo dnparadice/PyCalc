@@ -1,6 +1,7 @@
 import ast
 import inspect
 import tkinter as tk
+from tkinter import font as tkfont
 import tkinter.filedialog as filedialog
 import pathlib
 from tkinter import ttk
@@ -93,10 +94,10 @@ class CalculatorUiSettings:
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
-        self.stack_font = ('Arial', 24)
-        self.locals_font = ('Arial', 12)
-        self.message_font = ('Arial', 12)
-        self.button_font = ('Arial', 12)
+        self.stack_font = ('Courier New', 15)
+        self.locals_font = ('Courier New', 15)
+        self.message_font = ('Courier New', 15)
+        self.button_font = ('System', 12)
 
         self.ui_visible_state = UiVisibleState.STANDARD
         self.show_message_field = True
@@ -239,8 +240,8 @@ class MainWindow:
         self._view_menu.add_separator()
 
         # add option to set ui object height
-        self._view_menu.add_command(label='Set Heights', command=self.popup_set_stack_message_vars_height)
-
+        self._view_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
+        self._view_menu.add_command(label='Set font Parameters', command=self.popup_set_stack_font_parameters)
 
         # OPTIONS MENU ........................
 
@@ -354,10 +355,10 @@ class MainWindow:
             self._frame_stack = UiFrame(self._top_frame, background=self._background_color, padx=5, pady=5)
             self._frame_stack.pack(fill='x', expand=True)  # fill='x', expand=True
 
-            # add a table with 10 rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
+            # add a table with (n) rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
             self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type', ))
             self._stack_table.heading('#0', text='Index')
-            self._stack_table.heading('value', text='Value')
+            self._stack_table.heading('value', text='Stack Values')
             self._stack_table.heading('type', text='Type')
             self._stack_table.pack(fill='x', expand=True)
 
@@ -383,9 +384,22 @@ class MainWindow:
         # add right click menu to stack
         self._stack_table.bind(btn, self._right_click_menu_stack_table)
 
+        # ------ Configure the Style of ALL TreeView objects here -------
+
+        # Configure the Treeview style (this will affect all Treeview objects)
+        stack_style = ttk.Style()
+        fnt = self._settings.stack_font[0]  # self._settings.stack_font like: ('Courier New', 19)
+        f_size = self._settings.stack_font[1]
+        f_style = 'normal'  # like: 'bold', 'italic', 'normal'
+        stack_style.configure("Treeview", font=(fnt, f_size, f_style))
+        stack_style.configure("Treeview.Heading", font=('System', 12, f_style))
+
+        # set cell height based on font size
+        stack_style.configure("Treeview", rowheight=f_size + 8)  # add some padding to the font size for row height
+
         self._update_stack_display()
 
-        log(f"Stack Table column width: {self._stack_table.column('value', 'width')}")
+        print(f"tk fonts: {tkfont.names()}")
 
     """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
 
@@ -431,7 +445,7 @@ class MainWindow:
             self._locals_table['height'] = self._settings.locals_rows
 
             self._locals_table.heading('#0', text='Key', )
-            self._locals_table.heading('value', text='Value')
+            self._locals_table.heading('value', text='Variable Values')
             self._locals_table.column('#0', width=self._settings.locals_width_key)
             self._locals_table.column('value', width=self._settings.locals_width_value)
             self._locals_table.pack(fill='x', expand=True)
@@ -470,6 +484,10 @@ class MainWindow:
         right_click_menu.add_separator()
         # add item: "remove selected item"
         right_click_menu.add_command(label='Remove selected items', command=self._remove_selected_item_from_locals_table)
+
+        right_click_menu.add_separator()
+        right_click_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
+
         right_click_menu.post(event.x_root, event.y_root)
 
     def _right_click_menu_stack_table(self, event):
@@ -485,6 +503,9 @@ class MainWindow:
         # add item: "remove selected item"
         right_click_menu.add_command(label='Clear Stack', command=self.clear_stack)
         right_click_menu.add_command(label='Clear Selected', command=self.stack_clear_selected)
+
+        right_click_menu.add_separator()
+        right_click_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
 
         right_click_menu.post(event.x_root, event.y_root)
 
@@ -1086,6 +1107,57 @@ class MainWindow:
         # create a button to cancel the changes
         ttk.Button(window, text='Close', command=window.destroy).pack()
 
+    # add popup to set the font name and size for the stack and variable tables
+    def popup_set_stack_font_parameters(self):
+        """ open a popup in which you can set the UiSettings variables for the stack font name and size in the UI """
+        window = tk.Toplevel(self._root)
+        window.title('Set Stack Font Parameters')
+        window.geometry('320x120')
+        window.resizable(False, False)
+
+        frm = ttk.Frame(window, padding=8)
+        frm.pack(expand=True, fill='both')
+
+        ttk.Label(frm, text='Font Name:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
+        font_name_entry = ttk.Entry(frm, width=20)
+        font_name_entry.insert(0, str(self._settings.stack_font[0]))
+        font_name_entry.grid(row=0, column=1, sticky='w', padx=4, pady=4)
+
+        ttk.Label(frm, text='Font Size:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
+        font_size_entry = ttk.Entry(frm, width=8)
+        font_size_entry.insert(0, str(self._settings.stack_font[1]))
+        font_size_entry.grid(row=1, column=1, sticky='w', padx=4, pady=4)
+
+        def apply_values():
+            new_font_name = font_name_entry.get()
+            try:
+                new_font_size = int(font_size_entry.get())
+                if new_font_size < 1:
+                    raise ValueError('Font size must be >= 1')
+            except Exception as ex:
+                self._update_message_display(f"Invalid font size: {ex}")
+                return
+
+            # apply to settings
+            self._settings.stack_font = (new_font_name, new_font_size)
+
+            # update stack table font
+            self._update_visible_ui_object_stack(self._settings.stack_rows)
+            self._update_stack_display()
+            self._update_message_display(f"Applied new stack font: {new_font_name} size {new_font_size}")
+
+
+            window.destroy()
+
+        # Buttons
+        btn_frame = ttk.Frame(frm)
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=10)
+        ttk.Button(btn_frame, text='OK', command=apply_values).pack(side='left', padx=6)
+        ttk.Button(btn_frame, text='Cancel', command=window.destroy).pack(side='left', padx=6)
+        # Enter key = apply
+        window.bind('<Return>', lambda e: apply_values())
+        font_name_entry.focus()
+
 
     def popup_set_stack_message_vars_height(self):
         """ open a popup in which you can set the UiSettings variables for the stack height, the message height and the
@@ -1209,6 +1281,14 @@ class MainWindow:
     def user_exit(self):
         """ exits the program, saves the state if the settings are set to save state on exit """
         if self._settings.save_state_on_exit:
+            pth = pathlib.Path(self._autosave_path)
+            if not pth.exists():
+                # create the file
+                # get currnet directory
+                my_dir = pathlib.Path.cwd()
+                pth = my_dir / 'last_state_autosave.pycalc'
+                pth.touch(exist_ok=True)
+                self._autosave_path = str(pth)
             self.menu_save_state(save_path=self._autosave_path)
             log(f"clean exit")
         self._root.quit()
