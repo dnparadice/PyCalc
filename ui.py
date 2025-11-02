@@ -165,10 +165,10 @@ class MainWindow:
         self._menu_bar.add_cascade(label='Edit', menu=self._edit_menu)
         self._view_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='View', menu=self._view_menu)
-        self._options_menu = tk.Menu(self._menu_bar)
-        self._menu_bar.add_cascade(label='Options', menu=self._options_menu)
         self._plot_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='Plot', menu=self._plot_menu)
+        self._function_menu = tk.Menu(self._menu_bar)
+        self._menu_bar.add_cascade(label='Functions', menu=self._function_menu)
 
         # FILE MENU ........................
 
@@ -181,6 +181,10 @@ class MainWindow:
         # add a 'save state' option to the file menu
         self._file_menu.add_command(label='Save state', command=self.menu_save_state)
 
+        # add a check option to the menu for 'save state on exit'
+        self._file_menu.add_checkbutton(label='Save state on exit', onvalue=True, offvalue=False)
+
+
         # EDIT MENU ........................
 
         # add a 'undo' option to the edit menu
@@ -192,16 +196,8 @@ class MainWindow:
         # add a 'clear all variables' option to the file menu
         self._edit_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
 
+
         # VIEW MENU ........................
-
-        # add a 'show user functions' option to the view menu that opens a popup window
-        self._view_menu.add_command(label='Show user functions', command=self.popup_show_user_functions)
-
-        # add a 'show all functions' option to the view menu that opens a popup window
-        self._view_menu.add_command(label='Show all functions', command=self.popup_show_all_functions)
-
-        # add a seperator line
-        self._view_menu.add_separator()
 
         # add a 'show message field' option to the view menu
         self._tk_var_menu_view_show_message_field = tk.BooleanVar()
@@ -241,43 +237,52 @@ class MainWindow:
 
         # add option to set ui object height
         self._view_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
-        self._view_menu.add_command(label='Set font Parameters', command=self.popup_set_stack_font_parameters)
+        self._view_menu.add_command(label='Set font parameters', command=self.popup_set_stack_font_parameters)
 
-        # OPTIONS MENU ........................
-
-        # add a check option to the menu for 'save state on exit'
-        self._options_menu.add_checkbutton(label='Save state on exit', onvalue=True, offvalue=False)
-
-        # add a separator
-        self._options_menu.add_separator()
+        self._view_menu.add_separator()
 
         # add an option to "edit the float format string" that calls the method edit_float_format_string
-        self._options_menu.add_command(label='Edit numeric display format', command=self.popup_edit_numeric_display_format)
+        self._view_menu.add_command(label='Edit numeric display format', command=self.popup_edit_numeric_display_format)
 
-        # add an option to "edit the plot options string" that calls the method edit_plot_options_string
-        self._options_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
-
-        # add a line separator
-        self._options_menu.add_separator()
-
-        # add an option to open the add function popup window that calls the method popup_add_function
-        self._options_menu.add_command(label='Add function', command=self.popup_add_function)
-        self._options_menu.add_command(label='Edit function', command=self.popup_edit_user_function)
-        self._options_menu.add_command(label='Remove function', command=self.popup_remove_user_function)
-
-        # add an option to 'clear all user functions' that calls the method clear_all_user_functions
-        self._options_menu.add_command(label='Clear all functions', command=self.popup_confirm_clear_all_user_functions)
-
-        self._options_menu.add_separator()
-
-        # add option to open the 'function buttons' popup
-        self._options_menu.add_command(label='Function buttons', command=self.popup_function_buttons)
 
         # PLOT MENU ............................
 
         self._plot_menu.add_command(label='Plot', command=self.popup_x_plot)
         self._plot_menu.add_command(label='XY Plot', command=self.popup_xy_plot)
         self._plot_menu.add_command(label='XYZ Plot', command=self.popup_xyz_plot)
+
+        self._plot_menu.add_separator()
+
+        # add an option to "edit the plot options string" that calls the method edit_plot_options_string
+        self._plot_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
+
+
+        # Function MENU ............................
+
+        # add an option to open the add function popup window that calls the method popup_add_function
+        self._function_menu.add_command(label='Add user function', command=self.popup_add_function)
+        self._function_menu.add_command(label='Edit user function', command=self.popup_edit_user_function)
+        self._function_menu.add_command(label='Remove user function', command=self.popup_remove_user_function)
+
+        # add a 'show user functions' option to the view menu that opens a popup window
+        self._function_menu.add_command(label='Show all user functions', command=self.popup_show_user_functions)
+
+        # add option to open the 'function buttons' popup
+        self._function_menu.add_command(label='Show user function buttons', command=self.popup_function_buttons)
+
+        self._function_menu.add_separator()
+
+        # add an option to 'clear all user functions' that calls the method clear_all_user_functions
+        self._function_menu.add_command(label='Clear all user functions', command=self.popup_confirm_clear_all_user_functions)
+
+        self._function_menu.add_separator()
+
+        # add a 'show all functions' option to the view menu that opens a popup window
+        self._function_menu.add_command(label='Show all functions', command=self.popup_show_all_functions)
+
+        self._function_menu.add_separator()
+
+
 
         # MENU BINDINGS ........................
 
@@ -363,7 +368,7 @@ class MainWindow:
             self._stack_table.pack(fill='x', expand=True)
 
             # add a graphic line below the stack table
-            ttk.Separator(self._frame_stack, orient='horizontal').pack()
+            ttk.Separator(self._frame_stack, orient='horizontal').pack(padx=10)
 
         # set table number of visible rows
         if number_visible_rows is not None:
@@ -483,10 +488,13 @@ class MainWindow:
         # add a line seperator to the menu
         right_click_menu.add_separator()
         # add item: "remove selected item"
-        right_click_menu.add_command(label='Remove selected items', command=self._remove_selected_item_from_locals_table)
+        right_click_menu.add_command(label='Remove selected variable', command=self._remove_selected_item_from_locals_table)
 
         right_click_menu.add_separator()
         right_click_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
+
+        right_click_menu.add_separator()
+        right_click_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
 
         right_click_menu.post(event.x_root, event.y_root)
 
@@ -558,7 +566,7 @@ class MainWindow:
 
         # create a label to ask the user to edit the value
         label = ttk.Label(window, text=f'Edit the value for: {key}')
-        label.pack()
+        label.pack(padx=10)
 
         # create a text entry field
         entry = ttk.Entry(window)
@@ -577,12 +585,12 @@ class MainWindow:
             window.destroy()
 
         # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_value).pack()
+        ttk.Button(window, text='OK', command=apply_value).pack(padx=10)
         # bind enter press to apply_value
         entry.bind('<Return>', lambda event: apply_value())
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
         entry.focus()
 
@@ -615,7 +623,7 @@ class MainWindow:
 
         # create a label to ask the user to edit the value
         label = ttk.Label(window, text=f'Edit the value for: {key}')
-        label.pack()
+        label.pack(padx=10)
 
         # create a text entry field
         entry = ttk.Entry(window)
@@ -639,10 +647,10 @@ class MainWindow:
         entry.bind('<Return>', lambda event: apply_value())
 
         # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_value).pack()
+        ttk.Button(window, text='OK', command=apply_value).pack(padx=10)
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
         # set focus to entry
         entry.focus()
@@ -705,7 +713,7 @@ class MainWindow:
                            width=2+button_width_mod,
                            ).grid(row=i // 3, column=i % 3,)
 
-            self._numeric_buttons.pack()
+            self._numeric_buttons.pack(padx=10)
 
         else:
             exists = hasattr(self, '_numeric_buttons')
@@ -733,7 +741,7 @@ class MainWindow:
                            command=lambda btn=button: self.button_press(btn),
                            width=5+button_width_mod,
                            ).grid(row=i, column=1)
-            self._calc_buttons.pack()
+            self._calc_buttons.pack(padx=10)
         else:
             exists = hasattr(self, '_calc_buttons')
             if exists:
@@ -757,7 +765,7 @@ class MainWindow:
                            command=lambda btn=button: self.button_press(btn),
                            ).grid(row=i // 2, column=i % 2)
 
-            self._operation_buttons.pack()
+            self._operation_buttons.pack(padx=10)
         else:
             exists = hasattr(self, '_operation_buttons')
             if exists:
@@ -806,7 +814,7 @@ class MainWindow:
                        command=lambda: self.show_plot(),
                        ).pack(fill='x')
 
-            self._special_buttons.pack()
+            self._special_buttons.pack(padx=10)
         else:
             exists = hasattr(self, '_special_buttons')
             if exists:
@@ -878,17 +886,17 @@ class MainWindow:
 
         # create a label to ask the user if they are sure
         label = ttk.Label(window, text='Are you sure you want to clear all user functions?')
-        label.pack()
+        label.pack(padx=10)
 
         def clear_all_user_functions():
             self._c.clear_user_functions()
             window.destroy()
 
         # create a button to confirm the clear all user functions
-        ttk.Button(window, text='OK', command=clear_all_user_functions).pack()
+        ttk.Button(window, text='OK', command=clear_all_user_functions).pack(padx=10)
 
         # create a button to cancel the clear all user functions
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
         
     def popup_remove_user_function(self):
         """ popup that has a list of user functions and a button to remove the selected function """
@@ -911,10 +919,10 @@ class MainWindow:
             window.destroy()
 
         # create a button to remove the selected function
-        ttk.Button(window, text='Remove', command=remove_user_function).pack()
+        ttk.Button(window, text='Remove', command=remove_user_function).pack(padx=10)
 
         # create a button to cancel the remove function
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
     def popup_edit_user_function(self):
         """opens a popup window that has a list of functions thhat when clicked displayes the function in a text field"""
@@ -1026,11 +1034,11 @@ class MainWindow:
                 window.destroy()
 
         # create a button to save the changes, bind the enter press to the ok button function
-        ttk.Button(window, text='OK', command=apply_function).pack()
+        ttk.Button(window, text='OK', command=apply_function).pack(padx=10)
         entry.bind('<Return>', lambda event: apply_function())
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
     def popup_show_user_functions(self):
         """ opens a popup window to show the user defined functions """
@@ -1048,7 +1056,7 @@ class MainWindow:
         entry.pack(expand=True, fill='both')
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
     def popup_show_all_functions(self):
         """ opens a popup window to show the all functions available to the calculator """
@@ -1079,10 +1087,10 @@ class MainWindow:
         entry.pack(expand=True, fill='both')
 
         # add a numeric filed at the bottom of the window that shows the number of functions
-        ttk.Label(window, text=f"Number of functions: {len(func_dict)}").pack()
+        ttk.Label(window, text=f"Number of functions: {len(func_dict)}").pack(padx=10)
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Close', command=window.destroy).pack()
+        ttk.Button(window, text='Close', command=window.destroy).pack(padx=10)
 
     def popup_function_buttons(self):
         """ opens a popup window to show the all user functions available to the calculator """
@@ -1092,7 +1100,7 @@ class MainWindow:
 
         # create a frame for the function buttons
         frame = UiFrame(window, background=self._background_color, padx=5, pady=5)
-        frame.pack()
+        frame.pack(padx=10)
 
         # create a button for each function
         func_dict = self._c.return_user_functions()
@@ -1105,7 +1113,7 @@ class MainWindow:
                            ).pack(fill='x')
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Close', command=window.destroy).pack()
+        ttk.Button(window, text='Close', command=window.destroy).pack(padx=10)
 
     # add popup to set the font name and size for the stack and variable tables
     def popup_set_stack_font_parameters(self):
@@ -1747,7 +1755,7 @@ class MainWindow:
         # create a checkbox to toggle scientific notation
         c_button = ttk.Checkbutton(window, text='Use Engineering Notation', variable=use_eng_notation_tk, onvalue=True, offvalue=False,
                                    command=apply_eng_notation, name='eng_notation')
-        c_button.pack()
+        c_button.pack(padx=10)
 
 
         # add text below the checkbox that says: 'If use engineering notation is checked, the format string will be ignored'
@@ -1777,11 +1785,15 @@ class MainWindow:
         window = tk.Toplevel(self._root)
         window.title('Edit Plot Options String')
 
+        # create a text indicator
+        ttk.Label(window, text='Plot Options String for simple plots').pack(padx=10)
+
+
         # create a text entry field
         entry = ttk.Entry(window)
         entry.insert(0, self._settings.plot_options_string)
         entry.focus()
-        entry.pack()
+        entry.pack(pady=10)
 
         def apply_plot_options_string():
             self._settings.plot_options_string = entry.get()
@@ -1810,7 +1822,7 @@ class MainWindow:
         entry.insert(0, self._settings.integer_format_string)
         # make the focus be on the entry field
         entry.focus()
-        entry.pack()
+        entry.pack(padx=10)
 
         def apply_integer_format_string():
             self._settings.integer_format_string = entry.get()
@@ -1823,10 +1835,10 @@ class MainWindow:
                 window.destroy()
 
         # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_integer_format_string).pack()
+        ttk.Button(window, text='OK', command=apply_integer_format_string).pack(padx=10)
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
     def _apply_ui_settings(self, settings: CalculatorUiSettings):
         """ applies the settings to the ui """
