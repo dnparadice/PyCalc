@@ -1066,7 +1066,10 @@ class Calculator:
                     elif operation == '*':
                         result = y * x
                     elif operation == '/':
-                        result = y / x
+                        if x != 0:
+                            result = y / x
+                        else:
+                            result = float('inf')
                     elif operation == '**':
                         result = y ** x
                     else:
