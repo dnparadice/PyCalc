@@ -199,11 +199,11 @@ class Calculator:
         if len(self._stack_history) > 0:
             self._stack = self._stack_history.pop(-1)
             self._message = f"Undo: restored stack to previous state. History Length: '{len(self._stack_history)}'"
-            log(self._message)
-            log(f"STACK: {self._stack}")
+
         else:
             self._message = f"Error: no history to undo"
-            log(self._message)
+        log(self._message)
+        log(f"STACK: {self._stack}")
 
     """ -------------------------------- Math Wrapper Functions -------------------------------- """
 
@@ -225,7 +225,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'x^2'"
-            log(self._message)
+        log(self._message)
 
     def raise_pow_x(self):
         """ raises y to the power of x"""
@@ -248,7 +248,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'x^y'"
-            log(self._message)
+        log(self._message)
 
     def raise_pow_e(self):
         """ raises e to the power of x """
@@ -268,7 +268,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'e^x'"
-            log(self._message)
+        log(self._message)
 
     def natural_log(self):
         """ takes the natural log of the value in X """
@@ -288,7 +288,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'ln'"
-            log(self._message)
+        log(self._message)
 
     def n_choose_r(self):
         """ calculates the number of ways to choose r items from a set of n items where r=x and n=y """
@@ -311,7 +311,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'nCr'"
-            log(self._message)
+        log(self._message)
 
     def n_permutations_r(self):
         """ calculates the number of ways to choose r items from a set of n items where order matters, where r=x and n=y
@@ -335,7 +335,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'nPr'"
-            log(self._message)
+        log(self._message)
 
     def negate_x(self):
         """ negates the value in x """
@@ -355,7 +355,8 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'negate'"
-            log(self._message)
+
+        log(self._message)
 
     def reciprocal_x(self):
         """ takes the reciprocal of the value in X """
@@ -375,7 +376,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'reciprocal'"
-            log(self._message)
+        log(self._message)
 
     """  -------------------------------- Stack Operations -------------------------------- """
 
@@ -391,7 +392,7 @@ class Calculator:
             self._message = f"Swap: {x} and {y}"
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'swap'"
-            log(self._message)
+        log(self._message)
 
     """ -------------------------------------- Plotting ----------------------------------- """
 
@@ -417,7 +418,7 @@ class Calculator:
                 self._message = f"Plot shown"
             except Exception as ex:
                 self._message = f"Error: show_plot() cant show plot with error: '{ex}'"
-                log(self._message)
+            log(self._message)
 
     def show_plots_dict(self, plots: dict):
         """ shows a plot of X vs Y, X and Y can be any iterable, like a list or numpy array:
@@ -571,6 +572,8 @@ class Calculator:
                     raise Exception(self._message)
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: '{self._stack[0]}'"
+
+        log(self._message)
 
     def two_arg_function_press(self, function):
         """ uses the math library to perform a function on the stack value and put the result back on the stack.
@@ -1279,13 +1282,15 @@ class Calculator:
          @param idx: the stack level (idx) to clear, if idx is out of range, the stack is not cleared """
         self._update_stack_history()
         self._message = None
-        log(f"Clear Stack Level: {idx}")
+        ret = None
         if idx < len(self._stack):
-            return self._stack.pop(idx)
+            ret = self._stack.pop(idx)
+            self._message = f"Clear Stack Level: {idx} value: {ret}"
         else:
             self._message = f"Error: cannot clear stack level: '{idx}', it is out of range"
-            log(self._message)
-            return None
+        log(self._message)
+        return ret
+
 
     def clear_all_variables(self):
         """ clears all the local variables """
