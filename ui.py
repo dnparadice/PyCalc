@@ -361,10 +361,11 @@ class MainWindow:
             self._frame_stack.pack(fill='x', expand=True)  # fill='x', expand=True
 
             # add a table with (n) rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
-            self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type', ))
+            # self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type', ))
+            self._stack_table = ttk.Treeview(self._frame_stack, columns=('type', 'value', ))
             self._stack_table.heading('#0', text='Index')
-            self._stack_table.heading('value', text='Stack Values')
             self._stack_table.heading('type', text='Type')
+            self._stack_table.heading('value', text='Stack Values')
             self._stack_table.pack(fill='x', expand=True)
 
             # add a graphic line below the stack table
@@ -612,7 +613,7 @@ class MainWindow:
         if len(selected) == 0:
             return
         key = self._stack_table.item(selected)['text']
-        value = self._stack_table.item(selected)['values'][0]
+        value = self._stack_table.item(selected)['values'][1]
         self.popup_edit_stack_value(key, value)
 
     def popup_edit_stack_value(self, key, value):
@@ -2055,7 +2056,8 @@ class MainWindow:
             self._stack_table.insert('',
                                      'end',
                                      text=f"{stack_index}",
-                                     values=(stack_entry_string, entry_type))
+                                     values=(entry_type, stack_entry_string),
+                                     )
 
     def _update_message_display(self, direct_message=None):
         """ updates the message field with the message from the calculator, you
