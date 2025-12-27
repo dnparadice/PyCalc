@@ -941,8 +941,7 @@ class MainWindow:
         function_field = tk.Text(window, height=25, width=50)
         function_field.pack(expand=True, fill='both', padx=5, pady=5)
 
-        def update_list_box(_in=None):
-
+        def update_list_box(_in=None,):
             current_selection = list_box.curselection()
 
             list_box.delete(0, 'end')
@@ -981,26 +980,25 @@ class MainWindow:
                 label.pack(padx=5, pady=5)
                 ttk.Button(popup, text='OK', command=popup.destroy).pack(padx=5, pady=5)
 
-
-
         def add_function():
             """ opens a popup to add a function """
-            self.popup_add_function()
+            self.popup_add_function(cb_method=update_list_box)
             # clear the list box
             list_box.delete(0, 'end')
             update_list_box()
 
         # selecting the listbox in any way shows the function
-        list_box.bind('<Double-1>', update_list_box)
-        list_box.bind('<Button-1>', update_list_box)
-        list_box.bind('<<ListboxSelect>>', update_list_box)
+        # list_box.bind('<Double-1>', show_function)
+        # list_box.bind('<Button-1>', show_function)
+        list_box.bind('<<ListboxSelect>>', show_function)
 
         # add some buttons
         ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Add Functon', command=add_function).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Save Changes', command=save_changes).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Refresh List', command=update_list_box).pack(side='left', padx=5, pady=5)
 
-    def popup_add_function(self, function_string=None, parent_object=None):
+    def popup_add_function(self, function_string=None, parent_object=None, cb_method=None):
         """ opens a popup window to add a function to the calculator """
         # create a new window
         if parent_object is None:
@@ -1032,6 +1030,8 @@ class MainWindow:
                 self._update_message_display(message)
             else:
                 self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
+                if cb_method is not None:
+                    cb_method()
                 window.destroy()
 
         # create a button to save the changes, bind the enter press to the ok button function
