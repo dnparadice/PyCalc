@@ -158,6 +158,8 @@ class Calculator:
 
                                     # wrappers for the math library that expose more natural language functions like ln
                                     'ln': lambda: self.natural_log(),
+                                    'log10': lambda: self.log_base_10(),
+                                    'log': lambda: self.log_base_10(),  # log is base 10 in this calc
                                     'ncr': lambda: self.n_choose_r(),
                                     'npr': lambda: self.n_permutations_r(),
 
@@ -281,6 +283,26 @@ class Calculator:
                 result = math.log(x)
                 self.stack_put(result)
                 self._message = f"Function: ln({x}) = {result}"
+            except Exception as ex:
+                self.stack_put(x)
+                self._message = f"Error: cannot perform function: 'ln' on non-number: '{x}' with error: '{ex}'"
+                log(self._message)
+                return
+        else:
+            self._message = f"Error: not enough values on the stack to perform the operation: 'ln'"
+        log(self._message)
+
+    def log_base_10(self):
+        """ takes the log base 10 of the value in X """
+        self._message = None
+        if len(self._stack) > 0:
+            self._update_stack_history()
+            x = self._stack.pop(0)
+            try:
+                x = self._convert_to_best_numeric(x)
+                result = math.log10(x)
+                self.stack_put(result)
+                self._message = f"Function: log10({x}) = {result}"
             except Exception as ex:
                 self.stack_put(x)
                 self._message = f"Error: cannot perform function: 'ln' on non-number: '{x}' with error: '{ex}'"
