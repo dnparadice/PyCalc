@@ -987,6 +987,25 @@ class MainWindow:
             list_box.delete(0, 'end')
             update_list_box()
 
+        def to_stack(exe=False):
+            # grab selected
+            selected = list_box.curselection()
+            if len(selected) == 0:
+                return
+            key = list_box.get(selected)
+            self._c.user_entry(key)
+            self._update_stack_display()
+            if exe is True:
+                self._c.enter_press()
+                self._update_stack_display()
+                self._update_message_display()
+
+            # set focus to the main window
+            self._root.focus_set()
+
+        def run_now():
+            to_stack(exe=True)
+
         # selecting the listbox in any way shows the function
         # list_box.bind('<Double-1>', show_function)
         # list_box.bind('<Button-1>', show_function)
@@ -996,7 +1015,8 @@ class MainWindow:
         ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Add Functon', command=add_function).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Save Changes', command=save_changes).pack(side='left', padx=5, pady=5)
-        ttk.Button(window, text='Refresh List', command=update_list_box).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='To Stack', command=to_stack).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Run', command=run_now).pack(side='left', padx=5, pady=5)
 
     def popup_add_function(self, function_string=None, parent_object=None, cb_method=None):
         """ opens a popup window to add a function to the calculator """
@@ -1263,6 +1283,8 @@ class MainWindow:
         self._update_stack_display()
         self._update_message_display()
         self._update_locals_display()
+        # set focus to the main window
+        self._root.focus_set()
 
     def _load_settings_on_launch(self):
         """ looks for the settings file 'last_state_autosave' in the local directory and loads it if the user has
