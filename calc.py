@@ -305,11 +305,11 @@ class Calculator:
                 self._message = f"Function: log10({x}) = {result}"
             except Exception as ex:
                 self.stack_put(x)
-                self._message = f"Error: cannot perform function: 'ln' on non-number: '{x}' with error: '{ex}'"
+                self._message = f"Error: cannot perform function: 'log10' on non-number: '{x}' with error: '{ex}'"
                 log(self._message)
                 return
         else:
-            self._message = f"Error: not enough values on the stack to perform the operation: 'ln'"
+            self._message = f"Error: not enough values on the stack to perform the operation: 'log'"
         log(self._message)
 
     def n_choose_r(self):
@@ -1402,6 +1402,8 @@ class Calculator:
             except Exception as ex:
                 raise ValueError(f"Cannot convert '{x}' to number with error: '{ex}'")
         elif isinstance(x, (int, float)):
+            return x
+        elif isinstance(x, complex):
             return x
         else:
             raise ValueError(f"Error: convert to best numeric, unknown type for x: '{x}'")
