@@ -911,6 +911,7 @@ class Calculator:
                         self._message = f"Evaluated: {x_str}{args} to {result}"
                         self.stack_put(result)
                         self._last_stack_operation = 'function'
+                        log(self._message)
                         return  # ----------------------------------------------------------------------------->
                     except Exception as ex:
                         pass  # try the next lib
@@ -937,6 +938,7 @@ class Calculator:
                             self._message = f"Evaluated: {exc_str}{args} to {result}"
                             self.stack_put(result)
                             self._last_stack_operation = 'function'
+                            log(self._message)
                             return  # --------------------------------------------------------------------------------->
                         except Exception as ex:
                             pass # try the next lib

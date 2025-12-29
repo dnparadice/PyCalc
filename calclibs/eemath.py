@@ -8,6 +8,7 @@ pi = 3.141592653589793 # pi
 _two_pi = 6.283185307179586 # 2 * pi
 capacitance_f = 1e-12  # default capacitance in farads 1pF
 inductance_h = 1e-9  # default inductance in henrys 1nH
+Z0 = 50.0  # default characteristic impedance in ohms
 
 # ------------------------------------------------------------------------------------------------------
 #                                       RF Functions
@@ -74,3 +75,48 @@ def polar_to_complex(magnitude: float, angle_degrees: float):
     real = magnitude *  math.cos(angle_radians)
     imag = magnitude * math.sin(angle_radians)
     return complex(real, imag)
+
+def complex_to_polar_deg(cnum: complex):
+    """ converts a complex number to polar coordinates
+    :param cnum: the complex number
+    :return : tuple (magnitude, angle in degrees) """
+
+    magnitude = abs(cnum)
+    angle_radians = math.atan2(cnum.imag, cnum.real)
+    angle_degrees = angle_radians * (180.0 / pi)
+    return magnitude, angle_degrees
+
+#    ------------- Transmission Lines  ----------------
+
+def admittance_of_open_stub(electrical_length_degrees: float, Zos=50):
+    """ calculates the admittance of an open stub transmission line
+    :param electrical_length_degrees: the electrical length in degrees must be < 90 degrees
+    :param Zos: the characteristic impedance of the open stub, default is 50 ohms """
+    Bos = math.tan(electrical_length_degrees)/Zos
+    return Bos
+
+def admittance_of_shorted_stub(electrical_length_degrees: float, Zss=50):
+    """ calculates the admittance of a shorted stub transmission line
+    :param electrical_length_degrees: the electrical length in degrees must be < 90 degrees
+    :param Zss: the characteristic impedance of the shorted stub, default is 50 ohms """
+    Bss = -1/(Zss * math.tan(electrical_length_degrees))
+    return Bss
+
+def s_param_to_dB(s_param: complex):
+    """ converts an S parameter to dB
+    :param s_param: the s-parameter as a complex number """
+    magnitude = abs(s_param)
+    if magnitude == 0:
+        return -math.inf
+    dB = 10 * math.log10(magnitude ** 2)
+    return dB
+
+def s_param_to_missmatch_loss(s_param: complex):
+    """ converts an S-parameter to missmatch loss in dB
+    :param s_param: the s-parameter like S11, S22, as a complex number """
+    magnitude = abs(s_param)
+    if magnitude == 1:
+        return -math.inf
+    ML_dB = -10 * math.log10(1 - magnitude ** 2)
+    return ML_dB
+
