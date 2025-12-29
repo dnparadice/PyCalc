@@ -220,7 +220,7 @@ The calculator allows the user to define functions that can be used in the calcu
 the calculator session.
 
 #### To add a user function:
-1) Navigate to  **Options -> Add FUnction**
+1) Navigate to  **Functions -> Add user functions**
 2) In the dialog that appears, enter the function using the standard Python formatting. For example:
     ```python
     def sqr_x(x):
@@ -228,7 +228,7 @@ the calculator session.
     ```
 3) Press 'OK' and the function will be added to the calculator and will be available for use in the calculator.
 
-A note on user functions: When defining a user function, you can use local variables that are stored to the 
+<span style="color:blue">Note: When defining a user function, you can use local variables that are stored to the 
 calculator variables. For example to make a function to calculate the output voltage of a resistor divider network 
 you can define the function like this:
 ```python
@@ -244,6 +244,7 @@ Additionally, you can navigate to
 **Options** -> **Function Buttons** 
 which will open a window that shows all the user functions as buttons. Clicking the button 
 will call the function with the current value of the stack X position as the argument.
+</span>
 
 As an example in the image below, define the user function **voltage_divider** as shown above, then set the variables 
 **R1** and
@@ -266,6 +267,20 @@ at stack position 0. Now press the **Plot** button and the resulting plot will s
 2) This will open a popup window with a list of all user functions. Select the function you want to remove 
 and press 'Remove'
 
+___________________
+
+### Even better user functions
+
+There is now a popup window that allows you to interact easily with user functions. Navigate to
+**Functions -> Edit User Functions** This window shows the current user functions in memory. Clicking
+on a function will load it into the text editor area where you can edit the function. After making changes
+click on the "Save Changes" to save or the "Cancel" button to revert. The real power of this window 
+is the "To Stack" and "Run" buttons: 
+
+- **To Stack** -- This button will load the function into the stack X position where you can type arguments 
+then press enter to evaluate the function. 
+- **Run** -- This button will evaluate the selected function. It will use the current value in the 
+X, Y, Z .. positional arguments and saved variables as needed. 
 ___________________
 
 ### User Options
@@ -347,12 +362,6 @@ at a time so you can also enter 'sin(3)' as:
 This is useful if you want to send user keyboard events directly to the calculator from some other User Interface. For 
 example if you already have a snazzy calculator UI and you want to use this calculator backend. I'm looking at you 
 flutter and js devs. 
-
-________________________
-
-### Future Features 
-- Installer for the UI 
-- better array / tensor viewer 
 
 ________________________
 
