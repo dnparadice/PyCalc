@@ -6,8 +6,9 @@ import tkinter.filedialog as filedialog
 import pathlib
 from tkinter import ttk
 from tkinter.ttk import Style
-from numpy import ndarray as ndarray
+import numpy as np
 import struct
+import re
 
 from calc import Calculator
 import engnum
@@ -1340,8 +1341,8 @@ class MainWindow:
                 info = f"INFO: {value}, bytes: {int(value).to_bytes(byteorder="big")}, big-endian "
             elif isinstance(value, float):
                 info = f"INFO: {value}, bytes: {struct.pack('>d', value)}, big-endian "
-            elif isinstance(value, ndarray):
-                se = value # type: ndarray
+            elif isinstance(value, np.ndarray):
+                se = value # type: np.ndarray
                 info = (f"INFO: [{float(se[0])}, ... , {float(se[-1])}] "
                                       f"shape: {se.shape}, dtype: {se.dtype}, max: {se.max():0.3f}, "
                                       f"min: {se.min():0.3f}, mean: {se.mean():0.3f}, sum: {se.sum():0.3f}")
@@ -1455,7 +1456,7 @@ class MainWindow:
         # make window dimensions 800 by 600
         window.geometry('400x400')
 
-        # crete grid manager for the popup
+        # crete grid manager for the popup2
         window.grid_rowconfigure(0, weight=1)
         window.grid_columnconfigure(0, weight=1)
         window.grid_propagate(False)  # prevent the window from resizing to fit the content
@@ -1466,7 +1467,7 @@ class MainWindow:
 
         # grab all the locals that are lists or arrays
         locals = self._c.return_locals()
-        local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, ndarray))}
+        local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, np.ndarray))}
         local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
 
         row = 1
@@ -1593,7 +1594,7 @@ class MainWindow:
 
             # grab all the locals that are lists or arrays
             locals = self._c.return_locals()
-            local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, ndarray))}
+            local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, np.ndarray))}
             local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
 
             row = 1
@@ -1667,10 +1668,172 @@ class MainWindow:
         """ opens a popup window to show the xyz plot options """
         pass
 
+
+    def str_to_numpy_array_simple(self, s: str, dtype = float, delimiter = None) -> np.ndarray:
+        """
+        Parse a string into a NumPy array.
+
+        Rules / behavior:
+        - If `delimiter` is provided, split fields by that delimiter (preserves empty fields).
+        - If `delimiter` is None, the function detects a delimiter in the first non-empty line:
+          prefers '\t', then ',', then ';'. If none are found, it uses whitespace rules.
+        - When using whitespace (no explicit delimiter found):
+          - If at least one non-empty line contains multiple whitespace-separated tokens,
+            the string is treated as a 2D table (each line -> a row, tokens split on whitespace).
+          - Otherwise the entire string is treated as a flat list of values (global whitespace split)
+            and a 1D array is returned (this is the change to support newline-separated values).
+        - Empty fields become np.nan (so numeric dtype can be preserved).
+        - Rows with different column counts are padded with np.nan to form a rectangular 2D array.
+        - Tries to cast to `dtype` (default float); if casting fails for some cells it will fallback to float
+          or to an object array.
+        """
+        if s is None:
+            return np.array([])
+
+        # Normalize input and lines
+        lines = s.splitlines()
+
+        # find first non-empty line for delimiter detection
+        first_non_empty = next((ln for ln in lines if ln.strip()), None)
+
+        chosen = delimiter
+        if chosen is None and first_non_empty is not None:
+            if '\t' in first_non_empty:
+                chosen = '\t'
+            elif ',' in first_non_empty:
+                chosen = ','
+            elif ';' in first_non_empty:
+                chosen = ';'
+            else:
+                chosen = None  # use whitespace rules below
+
+        # If we have an explicit delimiter (or detected tab/comma/semicolon), parse as a table
+        if chosen is not None:
+            parsed_rows = []
+            for ln in lines:
+                if ln.strip() == '':
+                    continue
+                tokens = [t.strip() for t in ln.split(chosen)]
+                row = []
+                for tok in tokens:
+                    if tok == '':
+                        row.append(np.nan)
+                    else:
+                        if dtype is not None:
+                            try:
+                                row.append(dtype(tok))
+                                continue
+                            except Exception:
+                                pass
+                        try:
+                            row.append(float(tok))
+                        except Exception:
+                            row.append(tok)
+                parsed_rows.append(row)
+
+            if not parsed_rows:
+                return np.array([])
+
+            max_cols = max(len(r) for r in parsed_rows)
+            for r in parsed_rows:
+                if len(r) < max_cols:
+                    r.extend([np.nan] * (max_cols - len(r)))
+
+            try:
+                arr = np.array(parsed_rows, dtype=dtype)
+            except Exception:
+                try:
+                    arr = np.array(parsed_rows, dtype=float)
+                except Exception:
+                    arr = np.array(parsed_rows, dtype=object)
+
+            # Flatten single-row or single-column to 1D
+            if arr.ndim == 2 and (arr.shape[0] == 1 or arr.shape[1] == 1):
+                return arr.flatten()
+            return arr
+
+        # No explicit delimiter -> whitespace rules:
+        # Decide whether to treat as 2D table (per-line rows) or as a single flat list.
+        # If any non-empty line has more than one whitespace-separated token, treat as 2D.
+        non_empty_lines = [ln for ln in lines if ln.strip() != '']
+        line_token_counts = [len(re.split(r'\s+', ln.strip())) for ln in non_empty_lines]
+        treat_as_2d = any(count > 1 for count in line_token_counts)
+
+        if not non_empty_lines:
+            return np.array([])
+
+        if treat_as_2d:
+            # parse per-line into rows (whitespace splits), keeping per-line structure
+            parsed_rows = []
+            for ln in non_empty_lines:
+                tokens = re.split(r'\s+', ln.strip())
+                row = []
+                for tok in tokens:
+                    if tok == '':
+                        row.append(np.nan)
+                    else:
+                        if dtype is not None:
+                            try:
+                                row.append(dtype(tok))
+                                continue
+                            except Exception:
+                                pass
+                        try:
+                            row.append(float(tok))
+                        except Exception:
+                            row.append(tok)
+                parsed_rows.append(row)
+
+            max_cols = max(len(r) for r in parsed_rows)
+            for r in parsed_rows:
+                if len(r) < max_cols:
+                    r.extend([np.nan] * (max_cols - len(r)))
+
+            try:
+                arr = np.array(parsed_rows, dtype=dtype)
+            except Exception:
+                try:
+                    arr = np.array(parsed_rows, dtype=float)
+                except Exception:
+                    arr = np.array(parsed_rows, dtype=object)
+
+            if arr.ndim == 2 and (arr.shape[0] == 1 or arr.shape[1] == 1):
+                return arr.flatten()
+            return arr
+
+        else:
+            # Treat the whole input as a flat list of tokens separated by any whitespace (this handles newline-separated values)
+            tokens = re.split(r'\s+', ' '.join(non_empty_lines).strip())
+            vals = []
+            for tok in tokens:
+                if tok == '':
+                    continue
+                if dtype is not None:
+                    try:
+                        vals.append(dtype(tok))
+                        continue
+                    except Exception:
+                        pass
+                try:
+                    vals.append(float(tok))
+                except Exception:
+                    vals.append(tok)
+            try:
+                return np.array(vals, dtype=dtype)
+            except Exception:
+                try:
+                    return np.array(vals, dtype=float)
+                except Exception:
+                    return np.array(vals, dtype=object)
+
     def paste(self, value):
         """ handles pasting from the clipboard """
         if isinstance(value, str):
-            if '\n' in value: # go ahead and split the string into lines
+            if '\t' in value:  # tab delimited string, likely from a
+                array = self.str_to_numpy_array_simple(value, delimiter='\t')
+                self._c.stack_put(array)
+
+            elif '\n' in value: # go ahead and split the string into lines
                 lines = value.split('\n')
 
                 tags = {'def', 'class'} # for when you paste a function or class definition
