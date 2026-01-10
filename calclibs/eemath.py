@@ -120,3 +120,13 @@ def s_param_to_missmatch_loss(s_param: complex):
     ML_dB = -10 * math.log10(1 - magnitude ** 2)
     return ML_dB
 
+def series_caps_solved_for_match(Cs: float, Cx: float):
+    """
+    Uses local variables Cs for the total capacitance desired, and Cx as the existing capacitance, solved for the 
+    matching capacitance Cm. If Cm is greater than Cx then adding a cap to get the desired Cs.
+    :param Cs: total capacitance desired in farads
+    :param Cx: existing capacitance in farads
+    :return: Cm: matching capacitance in farads
+    """
+    Cm = (Cs*Cx) / (Cx-Cs)
+    return Cm
