@@ -15,6 +15,34 @@ try:
 except ImportError:
     log = print
 
+# log the launch
+print(r"""
+                                                                              |
+                                                                             ||
+                                                                            |||
+                                                                        |||||||
+                                                                |||||||||||||||
+                                                        |||||||||||||||||||||||
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||     __________        _________        .__               ||||||||||
+|||||||||||     \______   \___.__.\_   ___ \_____  |  |   ____       ||||||||||
+|||||||||||      |     ___<   |  |/    \  \/\__  \ |  | _/ ___\      ||||||||||
+|||||||||||      |    |    \___  |\     \____/ __ \|  |_\  \___      ||||||||||
+|||||||||||      |____|    / ____| \______  (____  /____/\___  >     ||||||||||
+|||||||||||                \/             \/     \/          \/      ||||||||||
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||||||
+||||||||||||
+|||||
+|||
+||
+|
+                                                
+""")
+
+print("----------------------------------------------------------------\n")
+
+
 # log the python imported lib versions
 log(f"Python version: {sys.version}")
 log(f"numpy version: {np.__version__}")
@@ -102,7 +130,7 @@ class Calculator:
         calc_math = set(one_arg_math_funcs + two_arg_math_funcs + iterable_math_funcs + math_constants)
         difference = all_math - calc_math
         if len(difference) > 0:  # if there is difference, print them out so we can see what we missed
-            log(f"Error: new function found in math library: \n")
+            log(f"Warning: new function found in python math library, that is not mapped to PyCalc: \n")
             for item in difference:
                 try:
                     sig = inspect.signature(getattr(math, item))

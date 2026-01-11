@@ -97,8 +97,8 @@ class CalculatorUiSettings:
 
         self.stack_font = ('Courier New', 15)
         self.locals_font = ('Courier New', 15)
-        self.message_font = ('Courier New', 15)
-        self.button_font = ('System', 12)
+        self.message_font = ('Default', 15)
+        self.button_font = ('Default', 12)
 
         self.ui_visible_state = UiVisibleState.STANDARD
         self.show_message_field = True
@@ -410,7 +410,7 @@ class MainWindow:
 
         self._update_stack_display()
 
-        print(f"tk fonts: {tkfont.names()}")
+        # print(f"tk fonts: {tkfont.names()}")  # for dev, does not print all fonts loaded onto PC
 
     """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
 
