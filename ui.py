@@ -2055,12 +2055,6 @@ class MainWindow:
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
-    def _apply_ui_settings(self, settings: CalculatorUiSettings):
-        """ applies the settings to the ui """
-        # todo : this needs work, when called on launch the objects dont exist yet, need to change the order of operations
-        msg = f"Apply Settings on a live window is not implemented yet"
-        log(msg)
-
     def menu_save_state(self, save_path=None):
         """ saves the locals stack and settings to a file of the users choice
          @param save_path: str, the path to save the state to, if None a file dialog will be opened
@@ -2139,8 +2133,7 @@ class MainWindow:
                 setattr(incoming, key, getattr(latest, key))
 
             self._settings = incoming
-            self._apply_ui_settings(self._settings)
-            log(f"loaded settings: {calc_state.settings}")
+
         try:
             if calc_state.functions is not None:
                 for key, value in calc_state.functions.items():

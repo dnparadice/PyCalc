@@ -1,12 +1,12 @@
 
 import numpy as np
 import math as math
+import matplotlib
 import matplotlib.pyplot as plt
 from copy import copy
 import inspect
 import builtins
 import sys
-import plots
 
 try:
     from logger import Logger
@@ -46,6 +46,7 @@ print("----------------------------------------------------------------\n")
 # log the python imported lib versions
 log(f"Python version: {sys.version}")
 log(f"numpy version: {np.__version__}")
+log(f"matplotlib version: {matplotlib.__version__}")
 
 
 
@@ -77,7 +78,6 @@ class Calculator:
     def __init__(self):
         """ initializes the calculator object with the default values for the stack, locals, and exec_globals """
         # print the version of python
-        print(f"Python version: {sys.version}")
         self._stack = []
         self._last_stack_operation = None
         self._stack_history_length = 100 # units are in number of saved stacks, not a memory size
@@ -130,7 +130,7 @@ class Calculator:
         calc_math = set(one_arg_math_funcs + two_arg_math_funcs + iterable_math_funcs + math_constants)
         difference = all_math - calc_math
         if len(difference) > 0:  # if there is difference, print them out so we can see what we missed
-            log(f"Warning: new function found in python math library, that is not mapped to PyCalc: \n")
+            log(f"Warning: new function(s) found in python math library, that is not mapped to PyCalc: \n")
             for item in difference:
                 try:
                     sig = inspect.signature(getattr(math, item))
@@ -1304,7 +1304,6 @@ class Calculator:
         @param clear_first: if True clear the existing locals dictionary before loading the new one
         """
         self._message = None
-        log(f"Load Locals")
         if clear_first:
             self._locals = dict()
         self._locals.update(new_locals)
