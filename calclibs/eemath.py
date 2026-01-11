@@ -130,3 +130,39 @@ def series_caps_solved_for_match(Cs: float, Cx: float):
     """
     Cm = (Cs*Cx) / (Cx-Cs)
     return Cm
+
+def return_loss(reflection_coeff: complex):
+    """ calculates the return loss in dB from the reflection coefficient by the equation:
+    RL(dB) = -20 log10|Γ|
+    :param reflection_coeff: the reflection coefficient Γ (gamma) as a complex number """
+    magnitude = abs(reflection_coeff)
+    if magnitude == 0:
+        return math.inf
+    RL_dB = -20 * math.log10(magnitude)
+    return RL_dB
+
+def reflection_coefficient_of_complex_load(load_impedance: complex, characteristic_impedance=50.0):
+    """ calculates the reflection coefficient Γ (gamma) of a complex load impedance bu the equation:
+    Γ = (Zload - Z0) / (Zload + Z0)
+    :param load_impedance: the load impedance as a complex number
+    :param characteristic_impedance: the characteristic impedance of the transmission line, default is 50 ohms """
+    gamma = (load_impedance - characteristic_impedance) / (load_impedance + characteristic_impedance)
+    return gamma
+
+def wavelength_in_meters(f_Hz: float, er=4.0):
+    """ calculates the wavelength in meters for a given frequency and dielectric constant by the equation:
+    λ = c / (f * √εr)
+    :param f_Hz: the frequency in hertz
+    :param er: the relative permittivity (dielectric constant), default is 4.0 (typical for FR4) """
+    c = 299792458  # speed of light in m/s
+    wavelength = c / (f_Hz * math.sqrt(er))
+    return wavelength
+
+def mismatch_loss_from_vswr(vswr: float):
+    """ calculates the mismatch loss in dB from the VSWR by the equation:
+    ML(dB) = 10 log10( 1 - ((VSWR - 1) / (VSWR + 1))² )
+    :param vswr: the voltage standing wave ratio (VSWR) """
+    if vswr == 1:
+        return 0.0
+    ml_dB = 10 * math.log10( 1 - ((vswr - 1) / (vswr + 1)) ** 2 )
+    return ml_dB

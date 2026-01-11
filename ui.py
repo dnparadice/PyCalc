@@ -194,6 +194,8 @@ class MainWindow:
         # add a 'clear stack' option to the edit menu
         self._edit_menu.add_command(label='Clear stack', command=self.clear_stack)
 
+        self._edit_menu.add_separator()
+
         # add a 'clear all variables' option to the file menu
         self._edit_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
 
@@ -261,8 +263,10 @@ class MainWindow:
         # Function MENU ............................
 
         # add an option to open the add function popup window that calls the method popup_add_function
-        self._function_menu.add_command(label='Add user function', command=self.popup_add_function)
-        self._function_menu.add_command(label='Edit user function', command=self.popup_edit_user_function)
+        self._function_menu.add_command(label='Edit user functions', command=self.popup_edit_user_function)
+
+        self._function_menu.add_separator()
+
         self._function_menu.add_command(label='Remove user function', command=self.popup_remove_user_function)
 
         # add a 'show user functions' option to the view menu that opens a popup window
@@ -929,20 +933,18 @@ class MainWindow:
     def popup_edit_user_function(self):
         """opens a popup window that has a list of functions thhat when clicked displayes the function in a text field"""
         # create a new window
-        window = tk.Toplevel(self._root)
-        window.title('Edit User Function')
 
-        # create a list box to show the user functions
-        list_box = tk.Listbox(window, height=10, width=50)
-        for key in self._c.return_user_functions().keys():
-            list_box.insert('end', key)
-        list_box.pack(expand=True, fill='both', padx=5, pady=5)
+        # -------- Local Methods for Popup Edit User Functions --------
 
-        # create a text filed to display the selected function
-        function_field = tk.Text(window, height=25, width=50)
-        function_field.pack(expand=True, fill='both', padx=5, pady=5)
+        def on_search_var_change(*args):
+            search_text = search_var.get().lower()
+            list_box.delete(0, 'end')
+            for key in self._c.return_user_functions().keys():
+                if search_text in key.lower():
+                    list_box.insert('end', key)
 
-        def update_list_box(_in=None,):
+
+        def update_list_box(_in=None, ):
             current_selection = list_box.curselection()
 
             list_box.delete(0, 'end')
@@ -953,7 +955,6 @@ class MainWindow:
             if current_selection:
                 list_box.selection_set(current_selection)
                 show_function()
-
 
         def show_function(_in=None):
             selected = list_box.curselection()
@@ -972,7 +973,7 @@ class MainWindow:
                     return
                 func_str = function_field.get('1.0', tk.END)
                 self._c.add_user_function(func_str)
-            except Exception as ex: # open a popup with the exception
+            except Exception as ex:  # open a popup with the exception
                 message = f"Exception saving function: {ex}"
                 # open a simple text popup displaying the message
                 popup = tk.Toplevel(self._root)
@@ -1006,6 +1007,34 @@ class MainWindow:
 
         def run_now():
             to_stack(exe=True)
+
+
+        # ------- build the popup window --------
+
+        window = tk.Toplevel(self._root)
+        window.title('Edit User Function')
+
+
+        # create a search field to search for functions
+        search_var = tk.StringVar()
+        # set default search var to: type here to search
+        search_var.set('search')
+        search_entry = ttk.Entry(window, textvariable=search_var)
+        search_entry.pack(fill='x', padx=5, pady=5)
+        search_var.trace_add('write', on_search_var_change)
+
+
+        # create a list box to show the user functions
+        list_box = tk.Listbox(window, height=10, width=50)
+        for key in self._c.return_user_functions().keys():
+            list_box.insert('end', key)
+        list_box.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # create a text filed to display the selected function
+        function_field = tk.Text(window, height=25, width=50)
+        function_field.pack(expand=True, fill='both', padx=5, pady=5)
+
+
 
         # selecting the listbox in any way shows the function
         # list_box.bind('<Double-1>', show_function)
