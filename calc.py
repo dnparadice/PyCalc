@@ -40,7 +40,6 @@ print(r"""
                                                 
 """)
 
-print("----------------------------------------------------------------\n")
 
 
 # log the python imported lib versions
@@ -113,23 +112,27 @@ class Calculator:
         one_arg_math_funcs = ['acos', 'acosh', 'asin', 'asinh', 'atan', 'atanh', 'ceil', 'cos', 'cosh', 'degrees',
                               'erf', 'erfc', 'exp', 'expm1', 'fabs', 'floor', 'gamma', 'lgamma', 'log1p', 'log2',
                               'log10', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'trunc', 'isnan', 'isinf',
-                              'isfinite', 'frexp', 'ulp', 'factorial', 'modf',]
+                              'isfinite', 'frexp', 'ulp', 'factorial', 'modf', 'exp2', 'cbrt']
 
         # List of all math functions that take exactly two arguments
         two_arg_math_funcs = ['atan2', 'copysign', 'fmod', 'gcd', 'hypot', 'ldexp', 'pow', 'remainder', 'nextafter',
-                              'isclose']
+                              'isclose', 'comb', 'perm']
+
+        # list of all math functions that take exactly three arguments
+        three_arg_math_funcs = ['fma',]
 
         # List of all math functions that only take an iterable as an argument
-        iterable_math_funcs = ['prod', 'comb', 'perm', 'gcd', 'isqrt', 'dist', 'lcm', 'fsum']
+        iterable_math_funcs = ['prod','gcd', 'isqrt', 'dist', 'lcm', 'fsum', 'sumprod']
 
         # list of all math constants
         math_constants = ['e', 'pi', 'tau', 'inf', 'nan']
 
         # as a check, make sure we have accounted for all the methods in the math libray
         all_math = {item for item in math_lib_functions if not item.startswith('_')}
-        calc_math = set(one_arg_math_funcs + two_arg_math_funcs + iterable_math_funcs + math_constants)
+        calc_math = set(one_arg_math_funcs + two_arg_math_funcs + iterable_math_funcs + three_arg_math_funcs + math_constants)
         difference = all_math - calc_math
         if len(difference) > 0:  # if there is difference, print them out so we can see what we missed
+            print("------------------------------------------------------------------------------------------------------")
             log(f"Warning: new function(s) found in python math library, that is not mapped to PyCalc: \n")
             for item in difference:
                 try:
@@ -138,7 +141,7 @@ class Calculator:
                           f'doc: {getattr(math, item).__doc__}')
                 except Exception as ex:
                     print(f'ERROR::: cant get signature for "{item}" with ex: {ex}')
-            print('------------------------------------------------------------------\n')
+            print('------------------------------------------------------------------------------------------------------')
 
         # link the math functions to the appropriate calculator methods
         one_args = {item: lambda i=item: self.one_arg_function_press(i) for item in one_arg_math_funcs}
