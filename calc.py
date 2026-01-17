@@ -159,12 +159,18 @@ class Calculator:
                                     '**': lambda: self.stack_operation('**'),
                                     '!': lambda: self.stack_function_press('factorial'),
                                     'x^2': lambda: self.raise_pow_2(),
+                                    'x²': lambda: self.raise_pow_2(),
                                     'x^y': lambda: self.raise_pow_x(),
+                                    'xʸ': lambda: self.raise_pow_x(),
                                     'e^x': lambda: self.raise_pow_e(),
+                                    'eˣ': lambda: self.raise_pow_e(),
+                                    '√': lambda: self.stack_operation('sqrt'),
 
                                     # constants
                                     'pi': lambda: self._constant_press('3.14159265'),
+                                    'π': lambda: self._constant_press('3.14159265'),
                                     'euler': lambda: self._constant_press('2.71828182'),
+                                    'ℇ': lambda: self._constant_press('2.71828182'),
                                     'phi': lambda: self._constant_press('1.61803398'),
                                     'jackpot': lambda: self._constant_press('777'),
 
@@ -175,8 +181,10 @@ class Calculator:
                                     'rot': lambda: self.roll_down(),
                                     'swap_x_y': lambda: self.swap_x_y(),
                                     'x<->y': lambda: self.swap_x_y(),
+                                    'x⟷y': lambda: self.swap_x_y(),
                                     'negate': lambda: self.negate_x(),
                                     '+/-': lambda: self.negate_x(),
+                                    '±': lambda: self.negate_x(),
                                     '1/x': lambda: self.reciprocal_x(),
                                     'recip': lambda: self.reciprocal_x(),
                                     'iterable_to_stack': lambda: self.iterable_to_stack(),
@@ -252,14 +260,14 @@ class Calculator:
                 x = self._convert_to_best_numeric(x)
                 result = x ** 2
                 self.stack_put(result)
-                self._message = f"Function: x^2({x}) = {result}"
+                self._message = f"Function: x²({x}) = {result}"
             except Exception as ex:
                 self.stack_put(x)
                 self._message = f"Error: cant raise x to the power of 2: '{x}' with error: '{ex}'"
                 log(self._message)
                 return
         else:
-            self._message = f"Error: not enough values on the stack to perform the operation: 'x^2'"
+            self._message = f"Error: not enough values on the stack to perform the operation: 'x²'"
         log(self._message)
 
     def raise_pow_x(self):
@@ -274,7 +282,7 @@ class Calculator:
                 y = self._convert_to_best_numeric(y)
                 result = y ** x
                 self.stack_put(result)
-                self._message = f"Function: x^y({x}, {y}) = {result}"
+                self._message = f"Function: xʸ({x}, {y}) = {result}"
             except Exception as ex:
                 self.stack_put(y)
                 self.stack_put(x)
@@ -282,7 +290,7 @@ class Calculator:
                 log(self._message)
                 return
         else:
-            self._message = f"Error: not enough values on the stack to perform the operation: 'x^y'"
+            self._message = f"Error: not enough values on the stack to perform the operation: 'xʸ'"
         log(self._message)
 
     def raise_pow_e(self):
@@ -295,14 +303,14 @@ class Calculator:
                 x = self._convert_to_best_numeric(x)
                 result = math.exp(x)
                 self.stack_put(result)
-                self._message = f"Function: e^x({x}) = {result}"
+                self._message = f"Function: eˣ({x}) = {result}"
             except Exception as ex:
                 self.stack_put(x)
                 self._message = f"Error: cant raise e to the power of x: '{x}' with error: '{ex}'"
                 log(self._message)
                 return
         else:
-            self._message = f"Error: not enough values on the stack to perform the operation: 'e^x'"
+            self._message = f"Error: not enough values on the stack to perform the operation: 'eˣ'"
         log(self._message)
 
     def natural_log(self):

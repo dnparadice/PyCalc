@@ -95,8 +95,8 @@ class CalculatorUiSettings:
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
-        self.stack_font = ('Courier New', 15)
-        self.locals_font = ('Courier New', 15)
+        self.stack_font = ('Default', 15)
+        self.locals_font = ('Default', 15)
         self.message_font = ('Default', 15)
         self.button_font = ('Default', 12)
 
@@ -645,6 +645,12 @@ class MainWindow:
         else:
             pass # do this at the end of the method too to destroy the buttons
 
+        # set font
+        fnt = self._settings.button_font[0]
+        f_size = self._settings.button_font[1]
+        f_style = 'normal'  # like: 'bold', 'italic', 'normal
+        ttk.Style().configure("TButton", font=(fnt, f_size, f_style))
+
         # Numeric buttons --------------------------------
 
         # ttk buttons ane not the same across OS, need to adjust the width of the buttons
@@ -660,7 +666,7 @@ class MainWindow:
         if self._settings.show_buttons is True:
             # create a frame for the math buttons
             self._numeric_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
-            numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
+            numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '±']
 
 
             # arrange the buttons on a grid in a standard calculator layout
@@ -683,8 +689,8 @@ class MainWindow:
         if self._settings.show_buttons is True:
             # create a frame for the calc buttons
             self._calc_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
-            calc_buttons = ['delete', 'clear', 'x<->y', '1/x', 'enter', ]
-            more_buttons = ['x^2', 'x^y', 'e^x', 'pi', 'euler']
+            calc_buttons = ['delete', 'clear', 'x⟷y', '1/x', 'enter', ]
+            more_buttons = ['x²', 'xʸ', 'eˣ', 'π', 'ℇ']
 
             # arrange the buttons on a grid with the calc buttons on the right and the more buttons on the left
             for i, button in enumerate(more_buttons):
@@ -693,12 +699,14 @@ class MainWindow:
                            command=lambda btn=button: self.button_press(btn),
                            width=5+button_width_mod,
                            ).grid(row=i, column=0)
+
             for i, button in enumerate(calc_buttons):
                 ttk.Button(self._calc_buttons,
                            text=button,
                            command=lambda btn=button: self.button_press(btn),
                            width=5+button_width_mod,
                            ).grid(row=i, column=1)
+
             self._calc_buttons.pack(padx=10)
         else:
             exists = hasattr(self, '_calc_buttons')
@@ -710,7 +718,7 @@ class MainWindow:
         if self._settings.show_buttons is True:
             # create a frame for operation buttons
             self._operation_buttons = UiFrame(self._left_frame, background=self._background_color, padx=5, pady=5)
-            operations = {'sqrt': 'sqrt', 'sin': 'sin', 'cos': 'cos', 'tan': 'tan', 'log': 'log10', 'ln': 'ln', }
+            operations = {'√': 'sqrt', 'sin': 'sin', 'cos': 'cos', 'tan': 'tan', 'log': 'log10', 'ln': 'ln', }
 
             # arrange the buttons on a grid in a standard calculator layout
             indexs = range(len(operations))
@@ -735,6 +743,12 @@ class MainWindow:
             # create a frame for the special buttons
             self._special_buttons = UiFrame(self._left_frame, background=self._background_color, padx=5, pady=5)
             # place to the right of the numeric buttons
+
+            # set font for all buttons in special buttons frame
+            fnt = self._settings.button_font[0]
+            f_size = self._settings.button_font[1]
+            f_style = 'normal'  # like: 'bold', 'italic', 'normal
+            set_font = (fnt, f_size, f_style)
 
             # create a button for 'stack to list'
             ttk.Button(self._special_buttons,
@@ -773,6 +787,7 @@ class MainWindow:
                        ).pack(fill='x')
 
             self._special_buttons.pack(padx=10)
+
         else:
             exists = hasattr(self, '_special_buttons')
             if exists:
@@ -797,8 +812,13 @@ class MainWindow:
             # add a field at the bottom for text messages
             self._message_field = tk.Text(self._top_frame,
                                           state='normal',
-                                          height=self._settings.message_height,
-                                          font=self._settings.message_font)
+                                          height=self._settings.message_height,)
+            # set the font with settings
+            fnt = self._settings.message_font[0]
+            f_size = self._settings.message_font[1]
+            f_style = 'normal'  # like: 'bold', 'italic', 'normal'
+            self._message_field.config(font=(fnt, f_size, f_style))
+
             # set width with settings
             self._message_field.config(width=self._settings.message_width)
             self._message_field.pack(expand=True, fill='x', padx=3)
@@ -1151,12 +1171,28 @@ class MainWindow:
 
             # apply to settings
             self._settings.stack_font = (new_font_name, new_font_size)
+            self._settings.message_font = (new_font_name, new_font_size)
+            self._settings.locals_font = (new_font_name, new_font_size)
+            self._settings.button_font = (new_font_name, 12)
 
             # update stack table font
             self._update_visible_ui_object_stack(self._settings.stack_rows)
             self._update_stack_display()
-            self._update_message_display(f"Applied new stack font: {new_font_name} size {new_font_size}")
 
+            # update the fonts for each section if visible
+            if self._settings.show_message_field is True:
+                self._set_visibility_message_field(False) # toggle visibility to update font on screen
+                self._set_visibility_message_field(True)
+
+            if self._settings.show_locals_table is True:
+                self._set_visibility_locals_table(False)
+                self._set_visibility_locals_table(True)
+
+            if self._settings.show_buttons is True:
+                self._set_visibility_buttons(False)
+                self._set_visibility_buttons(True)
+
+            self._update_message_display(f"Applied new stack font: {new_font_name} size {new_font_size}")
 
             window.destroy()
 
