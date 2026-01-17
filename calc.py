@@ -1,3 +1,4 @@
+import types
 
 import numpy as np
 import math as math
@@ -7,6 +8,7 @@ from copy import copy
 import inspect
 import builtins
 import sys
+# import calclibs.eemath
 
 try:
     from logger import Logger
@@ -1461,4 +1463,24 @@ class Calculator:
         inverted in the list, so stack[0] will be list[-1] if this setting is True"""
         self._setting_invert_lists = invert_lists
 
+    def load_python_module(self, module_name: str):
+        """ loads functions into user functions, loads classes into the exec_globals, loads module variables into
+         user variables """
 
+        try:
+            exec(f"import {module_name}", self._exec_globals)
+        except Exception as ex:
+            log(f"Failed to import module: '{module_name}' with error: '{ex}'")
+
+        # 'all_functions' is a list of tuples, e.g., [('acos', <built-in function acos>), ...]
+        all_functions = inspect.getmembers(sys.modules[module_name], inspect.isfunction)
+
+        for function in all_functions:
+
+            code = inspect.getsource(function[1])
+            self.add_user_function(code)
+
+        all_variables = {k: v for k, v in inspect.getmembers(sys.modules[module_name]) if not isinstance(v, (types.FunctionType, types.ModuleType)) and not k.startswith("__")}
+
+        self._locals.update(all_variables)
+        log('here')

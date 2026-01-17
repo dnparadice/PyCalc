@@ -104,6 +104,7 @@ class CalculatorUiSettings:
         self.show_message_field = True
         self.show_locals_table = True
         self.show_buttons = True
+        self.load_on_launch = ['calclibs.eemath']  # list of python modules to load on launch
 
 
 class CalculatorUiState:
@@ -173,36 +174,22 @@ class MainWindow:
 
         # FILE MENU ........................
 
-        # add a quit option to the file menu
         self._file_menu.add_command(label='Quit', command=self._root.quit)
-
-        # add a 'load state' option to the file menu
         self._file_menu.add_command(label='Load state', command=self.menu_load_state)
-
-        # add a 'save state' option to the file menu
         self._file_menu.add_command(label='Save state', command=self.menu_save_state)
-
-        # add a check option to the menu for 'save state on exit'
         self._file_menu.add_checkbutton(label='Save state on exit', onvalue=True, offvalue=False)
-
+        self._file_menu.add_separator()
+        self._file_menu.add_command(label='Load Python Module', command=self.popup_load_python_module)
 
         # EDIT MENU ........................
 
-        # add a 'undo' option to the edit menu
         self._edit_menu.add_command(label='Undo (ctrl+z)', command=self.undo_last_action)
-
-        # add a 'clear stack' option to the edit menu
         self._edit_menu.add_command(label='Clear stack', command=self.clear_stack)
-
         self._edit_menu.add_separator()
-
-        # add a 'clear all variables' option to the file menu
         self._edit_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
-
 
         # VIEW MENU ........................
 
-        # add a 'show message field' option to the view menu
         self._tk_var_menu_view_show_message_field = tk.BooleanVar()
         self._view_menu.add_checkbutton(label='Show message field',
                                         onvalue=True,
@@ -210,7 +197,6 @@ class MainWindow:
                                         variable=self._tk_var_menu_view_show_message_field,
                                         command=self._menu_view_show_message_field, )
 
-        # add a 'show locals table' option to the view menu
         self._tk_var_menu_view_show_locals_table = tk.BooleanVar()
         self._view_menu.add_checkbutton(label='Show locals table',
                                         onvalue=True,
@@ -218,7 +204,6 @@ class MainWindow:
                                         variable=self._tk_var_menu_view_show_locals_table,
                                         command=self._menu_view_show_locals_table, )
 
-        # add a 'show buttons' option to the view menu
         self._tk_var_menu_view_show_buttons = tk.BooleanVar()
         self._view_menu.add_checkbutton(label='Show buttons',
                                         onvalue=True,
@@ -226,68 +211,35 @@ class MainWindow:
                                         variable=self._tk_var_menu_view_show_buttons,
                                         command=self._menu_view_show_buttons, )
 
-        # add a seperator
         self._view_menu.add_separator()
-
-        # add a  'Standard View' option to the view menu
         self._view_menu.add_command(label='Standard View', command=self._apply_standard_view)
-
-        # add a 'Mini View' option to the view menu
         self._view_menu.add_command(label='Mini View', command=self._apply_mini_view)
-
-        # add seperator
         self._view_menu.add_separator()
-
-        # add option to set ui object height
         self._view_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
         self._view_menu.add_command(label='Set font parameters', command=self.popup_set_stack_font_parameters)
-
         self._view_menu.add_separator()
-
-        # add an option to "edit the float format string" that calls the method edit_float_format_string
         self._view_menu.add_command(label='Edit numeric display format', command=self.popup_edit_numeric_display_format)
-
 
         # PLOT MENU ............................
 
         self._plot_menu.add_command(label='Plot', command=self.popup_x_plot)
         self._plot_menu.add_command(label='XY Plot', command=self.popup_xy_plot)
         self._plot_menu.add_command(label='XYZ Plot', command=self.popup_xyz_plot)
-
         self._plot_menu.add_separator()
-
-        # add an option to "edit the plot options string" that calls the method edit_plot_options_string
         self._plot_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
-
 
         # Function MENU ............................
 
-        # add an option to open the add function popup window that calls the method popup_add_function
         self._function_menu.add_command(label='Edit user functions', command=self.popup_edit_user_function)
-
         self._function_menu.add_separator()
-
         self._function_menu.add_command(label='Remove user function', command=self.popup_remove_user_function)
-
-        # add a 'show user functions' option to the view menu that opens a popup window
         self._function_menu.add_command(label='Show all user functions', command=self.popup_show_user_functions)
-
-        # add option to open the 'function buttons' popup
         self._function_menu.add_command(label='Show user function buttons', command=self.popup_function_buttons)
-
         self._function_menu.add_separator()
-
-        # add an option to 'clear all user functions' that calls the method clear_all_user_functions
         self._function_menu.add_command(label='Clear all user functions', command=self.popup_confirm_clear_all_user_functions)
-
         self._function_menu.add_separator()
-
-        # add a 'show all functions' option to the view menu that opens a popup window
         self._function_menu.add_command(label='Show all functions', command=self.popup_show_all_functions)
-
         self._function_menu.add_separator()
-
-
 
         # MENU BINDINGS ........................
 
@@ -1338,6 +1290,15 @@ class MainWindow:
                 log(f"applied settings from file: {self._autosave_path}")
         except Exception as ex:
             self._update_message_display(f"Error loading settings on launch: {ex}")
+            log(f"Error loading settings from file: {self._autosave_path}")
+
+        try:
+            for lib in self._settings.load_on_launch:
+                self._c.load_python_module(lib)
+        except Exception as ex:
+            self._update_message_display(f"Error loading module on launch: {ex}")
+            log(f"Error loading module on launch: {ex}")
+
 
     def user_exit(self):
         """ exits the program, saves the state if the settings are set to save state on exit """
@@ -1696,6 +1657,58 @@ class MainWindow:
     def popup_xyz_plot(self):
         """ opens a popup window to show the xyz plot options """
         pass
+
+    def popup_load_python_module(self):
+        """ opens a popup window to load a python module into the calculator """
+        window = tk.Toplevel(self._root)
+        window.title('Load Python Module')
+        window.geometry('550x300')
+
+        modules = self._settings.load_on_launch
+
+        # add text label
+        ttk.Label(window, text='These modules are loaded on launch').pack(padx=10, pady=5)
+
+        # create a list box containing the modules to load on launch
+        listbox = tk.Listbox(window, height=5)
+        for mod in modules:
+            listbox.insert('end', mod)
+        listbox.pack(padx=10, pady=10, fill='both', expand=True)
+
+        def add_module():
+            """ adds a module to the list box """
+            module_name = module_entry.get().strip()
+            if module_name == '':
+                return
+            try:
+                self._c.load_python_module(module_name)
+                if module_name not in modules:
+                    modules.append(module_name)
+                    listbox.insert('end', module_name)
+                self._update_message_display(f"Loaded module: {module_name}")
+            except Exception as ex:
+                self._update_message_display(f"Error loading module '{module_name}': {ex}")
+
+        def remove_module():
+            """ removes the selected module from the list box """
+            selected = listbox.curselection()
+            if not selected:
+                return
+            index = selected[0]
+            module_name = listbox.get(index)
+            if module_name in modules:
+                modules.remove(module_name)
+            listbox.delete(index)
+            self._update_message_display(f"Removed module: {module_name}")
+
+        # set width to expand with window
+        module_entry = ttk.Entry(window, width=200)
+        module_entry.pack(padx=10, pady=5, expand=True)
+
+        add_button = ttk.Button(window, text='Add Module', command=add_module)
+        add_button.pack(padx=10, pady=5, side='left')
+        remove_button = ttk.Button(window, text='Remove Selected Module', command=remove_module)
+        remove_button.pack(padx=10, pady=5, side='right')
 
 
     def str_to_numpy_array_simple(self, s: str, dtype = float, delimiter = None) -> np.ndarray:
