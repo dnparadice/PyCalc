@@ -360,11 +360,20 @@ class MainWindow:
         # set cell height based on font size
         stack_style.configure("Treeview", rowheight=f_size + 8)  # add some padding to the font size for row height
 
+        # re-size window to fit all visible elements
+        self.re_draw_main_window_to_fit_all_elements()
+
         self._update_stack_display()
 
         # print(f"tk fonts: {tkfont.names()}")  # for dev, does not print all fonts loaded onto PC
 
     """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
+
+    def re_draw_main_window_to_fit_all_elements(self):
+        """ re-draws the main window to fit all visible elements """
+        self._root.update_idletasks()
+        self._root.geometry('')  # set to empty string to auto-size to fit all elements
+
 
     @ staticmethod
     def _get_menu_item_by_label( menu: tk.Menu, label: str):
@@ -427,6 +436,9 @@ class MainWindow:
 
             # add right click menu to locals
             self._locals_table.bind(btn, self._right_click_menu_locals_table)
+
+            # re-size window to fit all visible elements
+            self.re_draw_main_window_to_fit_all_elements()
 
             self._update_locals_display()
 
@@ -806,6 +818,9 @@ class MainWindow:
             if exists:
                 self._bottom_button_frame.destroy()
 
+        # re-size window to fit all visible elements
+        self.re_draw_main_window_to_fit_all_elements()
+
     def _set_visibility_message_field(self, state: bool):
         """ sets the visibility of the message field based on the state """
         if state is True:
@@ -824,6 +839,8 @@ class MainWindow:
             self._message_field.pack(expand=True, fill='x', padx=3)
             self._settings.show_message_field = True
             self._tk_var_menu_view_show_message_field.set(True)
+            # re-size window to fit all visible elements
+            self.re_draw_main_window_to_fit_all_elements()
             self._update_message_display()
         else:
             exists = hasattr(self, '_message_field')
