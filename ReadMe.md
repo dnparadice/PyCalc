@@ -1,7 +1,7 @@
 ## Hello and welcome to PyCalc, the RPN ~~calculator~~ ~~IDE~~ program that loves Python
 
 
-<img src="media/PyCalc-UiAndPlot-250610.jpg" alt="calculator and plot" width="800" height="auto">
+<img src="media/PyCalc_TerminalLaunch.jpg" alt="calculator and plot" width="800" height="auto">
 
 
 _______________________
@@ -18,6 +18,8 @@ calculator
 lacks the history and exposition of a Jupyter notebook and the power and massive catalog of tools available in Python. 
 Why not incorporate the strengths of all into one App. 
 So this project was born and has become a go-to tool for daily engineering math and quick Python scripting.
+
+<img src="media/PyCalc-minimode2.png" alt="mini mode" width="250" height="Auto">
 
 ### Highlights
 
@@ -302,11 +304,14 @@ ___________________
 ### View Options
 You can navigate to **View** menu to toggle the visibility of the stack, variables, and user functions windows. There 
 are two modes, 
-- **Standard View** shows all buttons, the message field, the variable viewer and the stack.
-- **Mini View** shows only the stack view and reduces the advisable number of stack rows to 2.
-- **Show user functions** Opens window that shows all user functions in memory.
-- **Show all functions** Opens window shows all imported functions in memory. This list does not include **User Functions**
-
+- **Show Message Field** -- toggles the message field visibility
+- **Show Variable Viewer** -- toggles the variable viewer visibility
+- **Show User Functions** -- toggles the user functions window visibility
+- **Standard View** -- shows all buttons, the message field, the variable viewer and the stack.
+- **Mini View** -- shows only the stack view and reduces the advisable number of stack rows to 2.
+- **Set Number of Stack Rows** -- opens a dialog to set the number of stack, variable and message rows to show in the UI.
+- **Set Font parameters** -- opens a dialog to set the font family and size for the stack, variable viewer and message field.
+- **Edit numeric display format** -- opens a dialog to set the numeric display format (see above section on User Options)
 
 <img src="media/PyCalc-minimode2.png" alt="mini mode" width="250" height="Auto">
 
