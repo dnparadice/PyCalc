@@ -486,6 +486,9 @@ class Calculator:
          :param plots: [dict] of plot objects like {<trace name>: <plots.PlotContainer>, ...}"""
         self._message = None
         try:
+            # clear the current figure
+            plt.clf()
+
             fig, ax = plt.subplots()
             for name, p in plots.items():
                 p.display_plot(ax, name)
