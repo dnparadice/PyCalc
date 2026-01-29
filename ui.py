@@ -1609,6 +1609,14 @@ class MainWindow:
             x_combo = ttk.Combobox(window, values=local_array_keys, textvariable=x_svar)
             y_combo = ttk.Combobox(window, values=local_array_keys, textvariable=y_svar)
 
+            def update_trace_label_to_selected_y(selected):
+                # get the current selected y variable and set the trace label to it
+                y = get_trace_key_from_svar(y_svar)
+                trace_label.delete(0, 'end')
+                trace_label.insert(0, y)
+
+            y_combo.bind("<<ComboboxSelected>>", update_trace_label_to_selected_y)
+
             trace_label = ttk.Entry(window)
             plot_label = ttk.Entry(window)
 
@@ -1617,6 +1625,8 @@ class MainWindow:
             marker_svar = tk.StringVar(window) # like 'o', 'x', etc.
             line_style_svar = tk.StringVar(window) # like '-', '--', etc.
             grid_svar = tk.BooleanVar(window, value=True)  # display grid? default to True
+
+
 
 
             def build_window_widgets():
@@ -1687,7 +1697,7 @@ class MainWindow:
                 ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10,
                                                                                sticky='e')
 
-
+                update_trace_label_to_selected_y(None)
 
             def get_trace_key_from_svar(svar: tk.StringVar):
                 """ returns the trace key from the StringVar """
@@ -1721,7 +1731,8 @@ class MainWindow:
                                       ylabel=get_trace_key_from_svar(y_svar),)
 
                 plots_dict.update({trace_label.get(): new_plot})
-                self._c.show_plots_dict(plots_dict)
+                title = plot_label.get()
+                self._c.show_plots_dict(plots_dict,title=title)
                 self._update_message_display()
 
 
@@ -1786,7 +1797,9 @@ class MainWindow:
             self._update_message_display(f"Removed module: {module_name}")
 
         # set width to expand with window
-        module_entry = ttk.Entry(window, width=200)
+
+        module_entry = ttk.Entry(window, width=200,)
+        module_entry.insert(0, "<enter module name or path>")
         module_entry.pack(padx=10, pady=5, expand=True)
 
         add_button = ttk.Button(window, text='Add Module', command=add_module)
@@ -2275,6 +2288,12 @@ class MainWindow:
     # define a method for button pushes that take a string as an argument and calls self._c.user_entry
     def button_press(self, input: str):
         self._c.user_entry(input)
+        self._update_stack_display()
+        self._update_message_display()
+        self._update_locals_display()
+
+    def button_eval_x(self):
+        self._c.run_eval_on_stack_x()
         self._update_stack_display()
         self._update_message_display()
         self._update_locals_display()

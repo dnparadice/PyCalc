@@ -1,5 +1,5 @@
 import types
-
+import sys
 import numpy as np
 import math as math
 import matplotlib
@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 from copy import copy
 import inspect
 import builtins
-import sys
-# import calclibs.eemath
 
 try:
     from logger import Logger
@@ -483,22 +481,25 @@ class Calculator:
                 self._message = f"Error: show_plot() cant show plot with error: '{ex}'"
             log(self._message)
 
-    def show_plots_dict(self, plots: dict):
+    def show_plots_dict(self, plots: dict, x_label="X", y_label="Y", title="XY plot", grid=True):
         """ shows a plot of X vs Y, X and Y can be any iterable, like a list or numpy array:
          :param plots: [dict] of plot objects like {<trace name>: <plots.PlotContainer>, ...}"""
         self._message = None
         try:
-            plot_lib = plt
+            fig, ax = plt.subplots()
             for name, p in plots.items():
-                p.display_plot(plot_lib, name)
+                p.display_plot(ax, name)
 
-            plot_lib.legend()
-            plot_lib.show()
+            plt.legend()
+            plt.grid(grid)
+            plt.xlabel(x_label)
+            plt.ylabel(y_label)
+            plt.title(title)
+            plt.show()
 
         except Exception as ex:
             self._message = f"Error: show_plots_dict() cant show plot with error: '{ex}'"
             log(self._message)
-
 
     def user_entry(self, user_input: any):
         """ Parses the user input string and performs the appropriate action. This method is the primary interface
@@ -1355,7 +1356,6 @@ class Calculator:
         log(self._message)
         return ret
 
-
     def clear_all_variables(self):
         """ clears all the local variables """
         self._update_stack_history()
@@ -1492,3 +1492,36 @@ class Calculator:
 
         self._locals.update(all_variables)
         log('here')
+
+    def run_eval_on_stack_x(self,):
+        self._update_stack_history()
+        self._message = None
+
+        x_temp = self._stack.pop(0)
+
+        try:
+            result = eval(x_temp, self._exec_globals)  # this works on input like 'np.arrange(10)'
+
+            self._message = f"Evaluated: {x_temp} to {result}"
+            result_type = type(result)
+            result_type_str = str(result_type)
+
+            good = {"<class 'type'>", "<class 'builtin_function_or_method'>", "<class 'function'>"}
+            if result_type_str in good:
+                # in this case the user probably wants to apply the builtin functon to Y
+                Y = self._stack.pop(0)
+                try:
+                    result = eval(x_temp, self._exec_globals)(Y)  # this works on input like 'np.arrange(Y)'
+                    self._message = f"Evaluated: {x_temp}({Y}) to {result}"
+                except Exception as ex:
+                    self._message = f"Error in run_eval_on_stack_x: eval: '{x_temp}({Y})' with exceptions ex: {ex}"
+                    self.stack_put(Y)
+
+            self._last_stack_operation = 'eval'
+            self.stack_put(result)
+
+        except Exception as ex:
+            self._message = f"Error in run_eval_on_stack_x: eval: '{x_temp}' with exceptions ex: {ex}"
+            self.stack_put(x_temp)
+
+        log(self._message)

@@ -28,10 +28,10 @@ class PlotContainer:
         self.ylabel = ylabel
         self.data = self.y_data
 
-    def display_plot(self, plot_obj: plt, name):
+    def display_plot(self, axis: plt.Axes, name):
         Y = self.y_data
         X = np.arange(len(Y))
-        plot_obj.plot(X, Y,
+        axis.plot(X, Y,
                  color=self.color,
                  linestyle=self.line_style,
                  marker=self.marker,
@@ -39,11 +39,6 @@ class PlotContainer:
                  markersize=self.markersize,
                  alpha=self.alpha,
                  label=name)
-        plot_obj.xlabel(self.xlabel)
-        plot_obj.ylabel(self.ylabel)
-        plot_obj.title(self.name)
-        if self.grid:
-            plt.grid(True)
 
 class XyPlotContainer(PlotContainer):
     def __init__(self,
@@ -64,8 +59,8 @@ class XyPlotContainer(PlotContainer):
         super().__init__(y_data, name, color, line_style, marker, linewidth, markersize, alpha, grid, xlabel, ylabel)
         self.x_data = np.array(x_data)
 
-    def display_plot(self, plot_obj: plt, name):
-        plot_obj.plot(self.x_data, self.y_data,
+    def display_plot(self, axis: plt.Axes, name):
+        axis.plot(self.x_data, self.y_data,
                  color=self.color,
                  linestyle=self.line_style,
                  marker=self.marker,
@@ -73,10 +68,5 @@ class XyPlotContainer(PlotContainer):
                  markersize=self.markersize,
                  alpha=self.alpha,
                  label=name)
-        plot_obj.xlabel(self.xlabel)
-        plot_obj.ylabel(self.ylabel)
-        plot_obj.title(self.name)
-        if self.grid:
-            plot_obj.grid(True)
 
 
