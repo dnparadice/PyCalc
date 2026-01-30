@@ -279,6 +279,9 @@ class MainWindow:
         # add binding for paste from os clipboard
         self._root.bind('<<Paste>>', lambda event: self.paste(self._root.clipboard_get()))
 
+        # bind double click on locals to insert value to stack at x
+        self._root.bind('<Double-1>', lambda event: self._insert_value_to_stack_at_x())
+
 
         # bind the program exit to the exit method
         self._root.protocol("WM_DELETE_WINDOW", self.user_exit)
