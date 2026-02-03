@@ -507,10 +507,10 @@ class MainWindow:
             self._update_message_display(f"Variable '{key}' not found in locals.")
             return
         self._c.user_entry(value)
-        self._c.enter_press()
 
         self._update_stack_display()
         self._update_message_display(f"Inserted value at x: {key}={value}")
+        log(f"Inserted value at x: {key}={value}")
 
     def _copy_variable_value(self):
         """ copies the value of the selected item in the locals table to the clipboard """
