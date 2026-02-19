@@ -982,14 +982,25 @@ class MainWindow:
             update_list_box()
 
         def to_stack(exe=False):
+            """ add the selected function to the stack, if exe is True then also execute the function after adding to stack """
             # grab selected
             selected = list_box.curselection()
             if len(selected) == 0:
                 return
-            key = list_box.get(selected)
-            self._c.user_entry(key)
-            self._update_stack_display()
-            if exe is True:
+
+            k = list_box.get(selected)
+            if exe is False:
+
+                self._c.user_entry(k)
+                self._update_stack_display()
+
+            else:
+                x = self._c.return_stack_for_display(0)
+
+                # if you just typed a number it may be a string in stack[0], convert it by enter press
+                if isinstance(x, str):
+                    self._c.enter_press()
+                self._c.user_entry(k)
                 self._c.enter_press()
                 self._update_stack_display()
                 self._update_message_display()
