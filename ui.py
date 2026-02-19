@@ -1566,19 +1566,23 @@ class MainWindow:
             # make window dimensions 800 by 600
             window.geometry('400x500')
 
+            # grab all the locals that are lists or arrays
+            plots_dict = dict()
+            len_str = ' ('
+            lcls = self._c.return_locals()
+            local_arrays = {key: value for key, value in lcls.items() if isinstance(value, (list, np.ndarray))}
+            local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
+
+            if len(local_arrays) < 1:
+                local_array_keys = ['No arrays defined']
+
             # crete grid manager for the popup
             window.grid_rowconfigure(0, weight=1)
             window.grid_columnconfigure(0, weight=1)
             window.grid_propagate(False)  # prevent the window from resizing to fit the content
             # create a label to ask the user to select the x and y variables
 
-            plots_dict = dict()
-            len_str = ' ('
 
-            # grab all the locals that are lists or arrays
-            lcls = self._c.return_locals()
-            local_arrays = {key: value for key, value in lcls.items() if isinstance(value, (list, np.ndarray))}
-            local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
 
             # setup the StringVars for the comboboxes
             x_svar = tk.StringVar(window) #  like: 'name'
