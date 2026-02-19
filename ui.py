@@ -232,8 +232,6 @@ class MainWindow:
 
         self._function_menu.add_command(label='Edit user functions', command=self.popup_edit_user_function)
         self._function_menu.add_separator()
-        self._function_menu.add_command(label='Remove user function', command=self.popup_remove_user_function)
-        self._function_menu.add_command(label='Show all user functions', command=self.popup_show_user_functions)
         self._function_menu.add_command(label='Show user function buttons', command=self.popup_function_buttons)
         self._function_menu.add_separator()
         self._function_menu.add_command(label='Clear all user functions', command=self.popup_confirm_clear_all_user_functions)
@@ -895,32 +893,7 @@ class MainWindow:
 
         # create a button to cancel the clear all user functions
         ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
-        
-    def popup_remove_user_function(self):
-        """ popup that has a list of user functions and a button to remove the selected function """
-        # create a new window
-        window = tk.Toplevel(self._root)
-        window.title('Remove User Function')
 
-        # create a list box to show the user functions
-        list_box = tk.Listbox(window, height=10, width=50)
-        for key in self._c.return_user_functions().keys():
-            list_box.insert('end', key)
-        list_box.pack(expand=True, fill='both')
-
-        def remove_user_function():
-            selected = list_box.curselection()
-            if len(selected) == 0:
-                return
-            key = list_box.get(selected)
-            self._c.clear_user_functions(key)
-            window.destroy()
-
-        # create a button to remove the selected function
-        ttk.Button(window, text='Remove', command=remove_user_function).pack(padx=10)
-
-        # create a button to cancel the remove function
-        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
     def popup_edit_user_function(self):
         """opens a popup window that has a list of functions thhat when clicked displayes the function in a text field"""
@@ -1011,6 +984,13 @@ class MainWindow:
         def run_now():
             to_stack(exe=True)
 
+        def remove_user_function():
+            selected = list_box.curselection()
+            if len(selected) == 0:
+                return
+            key = list_box.get(selected)
+            self._c.clear_user_functions(key)
+            update_list_box()
 
         # ------- build the popup window --------
 
@@ -1028,7 +1008,7 @@ class MainWindow:
 
 
         # create a list box to show the user functions
-        list_box = tk.Listbox(window, height=10, width=50)
+        list_box = tk.Listbox(window, height=10, width=75)
         for key in self._c.return_user_functions().keys():
             list_box.insert('end', key)
         list_box.pack(expand=True, fill='both', padx=5, pady=5)
@@ -1047,9 +1027,11 @@ class MainWindow:
         # add some buttons
         ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Add Functon', command=add_function).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Remove Function', command=remove_user_function).pack(side='left',padx=5, pady=5)
         ttk.Button(window, text='Save Changes', command=save_changes).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='To Stack', command=to_stack).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Run', command=run_now).pack(side='left', padx=5, pady=5)
+
 
     def popup_add_function(self, function_string=None, parent_object=None, cb_method=None):
         """ opens a popup window to add a function to the calculator """
@@ -1094,23 +1076,6 @@ class MainWindow:
         # create a button to cancel the changes
         ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
-    def popup_show_user_functions(self):
-        """ opens a popup window to show the user defined functions """
-        # create a new window
-        window = tk.Toplevel(self._root)
-        window.title('User Functions')
-
-        # create a text entry field
-        entry = tk.Text(window, height=42, width=50)
-        func_dict = self._c.return_user_functions_for_display()
-        for key, value in func_dict.items():
-            entry.insert('end', f"Name: '{key}':\n{value}____________________________________________\n")
-
-        # let the text area expand with the window
-        entry.pack(expand=True, fill='both')
-
-        # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
     def popup_show_all_functions(self):
         """ opens a popup window to show the all functions available to the calculator """
