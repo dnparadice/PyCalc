@@ -1,5 +1,6 @@
 import ast
 import inspect
+import subprocess
 import tkinter as tk
 from tkinter import font as tkfont
 import tkinter.filedialog as filedialog
@@ -992,6 +993,27 @@ class MainWindow:
             self._c.clear_user_functions(key)
             update_list_box()
 
+        def edit_in_idle(widget_in: tk.Text):
+            """ opens an """
+
+            # grab all the text
+            selected_text = widget_in.get("1.0", tk.END)
+
+            with open("temp.py", "w") as f:
+                f.write(selected_text)
+
+            subprocess.run(["python3", "-m", "idlelib.idle", "temp.py"])
+
+            with open("temp.py", "r") as f:
+                new_text = f.read()
+
+            # update the text widget with the new text
+            widget_in.delete("1.0", tk.END)
+            widget_in.insert("1.0", new_text)
+
+            # remove the temp file
+            subprocess.run(["rm", "temp.py"])
+
         # ------- build the popup window --------
 
         window = tk.Toplevel(self._root)
@@ -1025,7 +1047,8 @@ class MainWindow:
         list_box.bind('<<ListboxSelect>>', show_function)
 
         # add some buttons
-        ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', padx=5, pady=5)
+        # ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Edit in Idle', command=lambda: edit_in_idle(function_field)).pack(side='right', padx=5, pady=5)
         ttk.Button(window, text='Add Functon', command=add_function).pack(side='left', padx=5, pady=5)
         ttk.Button(window, text='Remove Function', command=remove_user_function).pack(side='left',padx=5, pady=5)
         ttk.Button(window, text='Save Changes', command=save_changes).pack(side='left', padx=5, pady=5)
