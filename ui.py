@@ -79,7 +79,6 @@ class CalculatorUiSettings:
         self.eng_format_num_length = 7
         self.integer_format_string = ','
         self.plot_options_string = '-o'
-        self.last_user_function_edit_name = None
 
         # window size and appearance
         self.stack_rows = 5
@@ -999,13 +998,19 @@ class MainWindow:
             # grab all the text
             selected_text = widget_in.get("1.0", tk.END)
 
+            window_text = ("# edit the function below, save and close the window to update the "
+                           "function in the calculator \n") + selected_text
+
             with open("temp.py", "w") as f:
-                f.write(selected_text)
+                f.write(window_text)
 
             subprocess.run(["python3", "-m", "idlelib.idle", "temp.py"])
 
             with open("temp.py", "r") as f:
                 new_text = f.read()
+                # remove first line if it starts with "# edit the function below"
+                if new_text.startswith("# edit the function below"):
+                    new_text = new_text.split("\n", 1)[1]
 
             # update the text widget with the new text
             widget_in.delete("1.0", tk.END)
@@ -1058,46 +1063,87 @@ class MainWindow:
 
     def popup_add_function(self, function_string=None, parent_object=None, cb_method=None):
         """ opens a popup window to add a function to the calculator """
-        # create a new window
-        if parent_object is None:
-            parent = self._root
-        else:
-            parent = parent_object
-        window = tk.Toplevel(parent)
-        window.title('Add Function')
 
-        # create a text entry field
-        entry = tk.Text(window, height=25, width=50)
         if function_string is None:
-            default_text = 'def sqr_x(x):\n    return x**2'
-            txt = self._c.return_user_functions().get(self._settings.last_user_function_edit_name, default_text)
-            entry.insert('1.0', txt)
+            input_txt = "# write your function below, save and close to window to add the function to the calculator \n "
         else:
-            entry.insert('1.0', function_string)
-        entry.focus()
+            input_txt = function_string
 
-        # let the text area expand with the window
-        entry.pack(expand=True, fill='both')
+        with open("temp.py", "w") as f:
+            f.write(input_txt)
 
-        def apply_function():
-            function_string = entry.get('1.0', 'end')
+        subprocess.run(["python3", "-m", "idlelib.idle", "temp.py"])
+
+        with open("temp.py", "r") as f:
+            function_string = f.read()
+
+            # remove the first line if it starts with "# write your function below"
+            if function_string.startswith("# write your function below"):
+                function_string = function_string.split("\n", 1)[1]
+
             try:
                 self._c.add_user_function(function_string)
             except Exception as ex:
                 message = f"Error adding function: {ex}"
+
+                # open popup with the message
+                popup = tk.Toplevel(self._root)
+                popup.title('Error Adding Function')
+                ttk.Label(popup, text=message).pack(padx=10, pady=10)
+                ttk.Button(popup, text='OK', command=popup.destroy).pack(padx=10, pady=10)
+                ttk.Button(popup, text='Edit', command=lambda: self.popup_add_function(function_string)).pack(padx=10, pady=10)
+
                 self._update_message_display(message)
             else:
-                self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
                 if cb_method is not None:
                     cb_method()
-                window.destroy()
 
-        # create a button to save the changes, bind the enter press to the ok button function
-        ttk.Button(window, text='OK', command=apply_function).pack(padx=10)
-        entry.bind('<Return>', lambda event: apply_function())
 
-        # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
+        # remove the temp file
+        subprocess.run(["rm", "temp.py"])
+
+
+
+        # # create a new window
+        # if parent_object is None:
+        #     parent = self._root
+        # else:
+        #     parent = parent_object
+        # window = tk.Toplevel(parent)
+        # window.title('Add Function')
+        #
+        # # create a text entry field
+        # entry = tk.Text(window, height=25, width=50)
+        # if function_string is None:
+        #     default_text = 'def sqr_x(x):\n    return x**2'
+        #     txt = self._c.return_user_functions().get(self._settings.last_user_function_edit_name, default_text)
+        #     entry.insert('1.0', txt)
+        # else:
+        #     entry.insert('1.0', function_string)
+        # entry.focus()
+        #
+        # # let the text area expand with the window
+        # entry.pack(expand=True, fill='both')
+        #
+        # def apply_function():
+        #     function_string = entry.get('1.0', 'end')
+        #     try:
+        #         self._c.add_user_function(function_string)
+        #     except Exception as ex:
+        #         message = f"Error adding function: {ex}"
+        #         self._update_message_display(message)
+        #     else:
+        #         self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
+        #         if cb_method is not None:
+        #             cb_method()
+        #         window.destroy()
+        #
+        # # create a button to save the changes, bind the enter press to the ok button function
+        # ttk.Button(window, text='OK', command=apply_function).pack(padx=10)
+        # entry.bind('<Return>', lambda event: apply_function())
+        #
+        # # create a button to cancel the changes
+        # ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
 
     def popup_show_all_functions(self):

@@ -1460,7 +1460,7 @@ class Calculator:
         try:
             exec(function_string, self._exec_globals)
             # get the name of the function
-            function_name = function_string.split(' ')[1].split('(')[0]
+            function_name = function_string.split('def')[1].split('(')[0].strip()
             self._user_functions.update({function_name: function_string})
             self._all_functions.add(function_name)
             self._message = f"Added user function: {function_string}"
