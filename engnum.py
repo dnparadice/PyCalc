@@ -38,6 +38,10 @@ def format_eng(number_in, max_digits_displayed=7):
      @param number_in: the number to be formated
      @param max_digits_displayed:(=7) the maximum number of digits to display in the mantissa """
 
+    if not isinstance(number_in, (float,int)):
+        print(f"Engineering Number Library: Passed value is not a number: {number_in}")
+        return number_in
+
     if number_in == 0:
         return "0.0"  # ----------------------------------------------------------------------------------------------->
 
@@ -56,13 +60,15 @@ def format_eng(number_in, max_digits_displayed=7):
     # create a list of bytes from the mantissa
     bites = list(str(mantissa_initial).encode('utf-8'))
     # print(f"bytes: {bites}")
-    try:
-        point = bites.pop(1)  # remove the decimal point (will be reinserted after determining the exponent)
-    except IndexError:
-        # print(f"engnum;format_eng decimal not at index 1 exception: number passed: {number_in}, mantissa: "
-        #       f"{mantissa_initial}, exponent: {exponent_initial}")
-        return str(number_in)  # -------------------------------------------------------------------------------------->
-    # print(f"bytes: {bites}")
+    point = 46  # byte value for decimal point, default is a period
+    if len(bites) > 1: # if the mantissa is a single digit like 1, 4, 7, etc... there is no decimal point
+        try:
+            point = bites.pop(1)  # remove the decimal point (will be reinserted after determining the exponent)
+        except IndexError:
+            # print(f"engnum;format_eng decimal not at index 1 exception: number passed: {number_in}, mantissa: "
+            #       f"{mantissa_initial}, exponent: {exponent_initial}")
+            return str(number_in)  # -------------------------------------------------------------------------------------->
+        # print(f"bytes: {bites}")
 
     # determine how to shift the decimal point and exponent
     div = abs(exponent_initial) // 3
@@ -93,7 +99,11 @@ def format_eng(number_in, max_digits_displayed=7):
         trimmed = bites[:trim_point]
 
     # convert the list back to a string
-    new_num = f"{'-' if number_in < 0 else ''}{bytearray(trimmed).decode()}E{exp_final}"
+    try:
+        new_num = f"{'-' if number_in < 0 else ''}{bytearray(trimmed).decode()}E{exp_final}"
+    except Exception as ex:
+        print(f"Engineering Number Library Exception: {ex}, passed value: {number_in}")
+        new_num = float('NaN')
     # print(f"new_num: {new_num}, original: {number_in}")
     # print(f"equal: {float(new_num) == number_in}")
     return new_num

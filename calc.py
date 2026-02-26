@@ -1,6 +1,8 @@
-
+import types
+import sys
 import numpy as np
 import math as math
+import matplotlib
 import matplotlib.pyplot as plt
 from copy import copy
 import inspect
@@ -12,6 +14,40 @@ try:
     log = logger.print_to_console
 except ImportError:
     log = print
+
+# log the launch
+print(r"""
+                                                                              |
+                                                                             ||
+                                                                            |||
+                                                                        |||||||
+                                                                |||||||||||||||
+                                                        |||||||||||||||||||||||
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||     __________        _________        .__               ||||||||||
+|||||||||||     \______   \___.__.\_   ___ \_____  |  |   ____       ||||||||||
+|||||||||||      |     ___<   |  |/    \  \/\__  \ |  | _/ ___\      ||||||||||
+|||||||||||      |    |    \___  |\     \____/ __ \|  |_\  \___      ||||||||||
+|||||||||||      |____|    / ____| \______  (____  /____/\___  >     ||||||||||
+|||||||||||                \/             \/     \/          \/      ||||||||||
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||||||
+||||||||||||
+|||||
+|||
+||
+|
+                                                
+""")
+
+
+
+# log the python imported lib versions
+log(f"Python version: {sys.version}")
+log(f"numpy version: {np.__version__}")
+log(f"matplotlib version: {matplotlib.__version__}")
+
+
 
 class Calculator:
     """ A class that implements the backend of an RPN style calculator with the ability to perform RPN style operations
@@ -40,6 +76,7 @@ class Calculator:
 
     def __init__(self):
         """ initializes the calculator object with the default values for the stack, locals, and exec_globals """
+        # print the version of python
         self._stack = []
         self._last_stack_operation = None
         self._stack_history_length = 100 # units are in number of saved stacks, not a memory size
@@ -75,24 +112,28 @@ class Calculator:
         one_arg_math_funcs = ['acos', 'acosh', 'asin', 'asinh', 'atan', 'atanh', 'ceil', 'cos', 'cosh', 'degrees',
                               'erf', 'erfc', 'exp', 'expm1', 'fabs', 'floor', 'gamma', 'lgamma', 'log1p', 'log2',
                               'log10', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'trunc', 'isnan', 'isinf',
-                              'isfinite', 'frexp', 'ulp', 'factorial', 'modf',]
+                              'isfinite', 'frexp', 'ulp', 'factorial', 'modf', 'exp2', 'cbrt']
 
         # List of all math functions that take exactly two arguments
         two_arg_math_funcs = ['atan2', 'copysign', 'fmod', 'gcd', 'hypot', 'ldexp', 'pow', 'remainder', 'nextafter',
-                              'isclose']
+                              'isclose', 'comb', 'perm']
+
+        # list of all math functions that take exactly three arguments
+        three_arg_math_funcs = ['fma',]
 
         # List of all math functions that only take an iterable as an argument
-        iterable_math_funcs = ['prod', 'comb', 'perm', 'gcd', 'isqrt', 'dist', 'lcm', 'fsum']
+        iterable_math_funcs = ['prod','gcd', 'isqrt', 'dist', 'lcm', 'fsum', 'sumprod']
 
         # list of all math constants
         math_constants = ['e', 'pi', 'tau', 'inf', 'nan']
 
         # as a check, make sure we have accounted for all the methods in the math libray
         all_math = {item for item in math_lib_functions if not item.startswith('_')}
-        calc_math = set(one_arg_math_funcs + two_arg_math_funcs + iterable_math_funcs + math_constants)
+        calc_math = set(one_arg_math_funcs + two_arg_math_funcs + iterable_math_funcs + three_arg_math_funcs + math_constants)
         difference = all_math - calc_math
         if len(difference) > 0:  # if there is difference, print them out so we can see what we missed
-            log(f"Error: new function found in math library: \n")
+            print("------------------------------------------------------------------------------------------------------")
+            log(f"Warning: new function(s) found in python math library, that is not mapped to PyCalc: \n")
             for item in difference:
                 try:
                     sig = inspect.signature(getattr(math, item))
@@ -100,7 +141,7 @@ class Calculator:
                           f'doc: {getattr(math, item).__doc__}')
                 except Exception as ex:
                     print(f'ERROR::: cant get signature for "{item}" with ex: {ex}')
-            print('------------------------------------------------------------------\n')
+            print('------------------------------------------------------------------------------------------------------')
 
         # link the math functions to the appropriate calculator methods
         one_args = {item: lambda i=item: self.one_arg_function_press(i) for item in one_arg_math_funcs}
@@ -116,12 +157,18 @@ class Calculator:
                                     '**': lambda: self.stack_operation('**'),
                                     '!': lambda: self.stack_function_press('factorial'),
                                     'x^2': lambda: self.raise_pow_2(),
+                                    'x²': lambda: self.raise_pow_2(),
                                     'x^y': lambda: self.raise_pow_x(),
+                                    'xʸ': lambda: self.raise_pow_x(),
                                     'e^x': lambda: self.raise_pow_e(),
+                                    'eˣ': lambda: self.raise_pow_e(),
+                                    '√': lambda: self.stack_operation('sqrt'),
 
                                     # constants
                                     'pi': lambda: self._constant_press('3.14159265'),
+                                    'π': lambda: self._constant_press('3.14159265'),
                                     'euler': lambda: self._constant_press('2.71828182'),
+                                    'ℇ': lambda: self._constant_press('2.71828182'),
                                     'phi': lambda: self._constant_press('1.61803398'),
                                     'jackpot': lambda: self._constant_press('777'),
 
@@ -132,8 +179,10 @@ class Calculator:
                                     'rot': lambda: self.roll_down(),
                                     'swap_x_y': lambda: self.swap_x_y(),
                                     'x<->y': lambda: self.swap_x_y(),
+                                    'x⟷y': lambda: self.swap_x_y(),
                                     'negate': lambda: self.negate_x(),
                                     '+/-': lambda: self.negate_x(),
+                                    '±': lambda: self.negate_x(),
                                     '1/x': lambda: self.reciprocal_x(),
                                     'recip': lambda: self.reciprocal_x(),
                                     'iterable_to_stack': lambda: self.iterable_to_stack(),
@@ -148,6 +197,8 @@ class Calculator:
 
                                     # wrappers for the math library that expose more natural language functions like ln
                                     'ln': lambda: self.natural_log(),
+                                    'log10': lambda: self.log_base_10(),
+                                    'log': lambda: self.log_base_10(),  # log is base 10 in this calc
                                     'ncr': lambda: self.n_choose_r(),
                                     'npr': lambda: self.n_permutations_r(),
 
@@ -189,11 +240,11 @@ class Calculator:
         if len(self._stack_history) > 0:
             self._stack = self._stack_history.pop(-1)
             self._message = f"Undo: restored stack to previous state. History Length: '{len(self._stack_history)}'"
-            log(self._message)
-            log(f"STACK: {self._stack}")
+
         else:
             self._message = f"Error: no history to undo"
-            log(self._message)
+        log(self._message)
+        log(f"STACK: {self._stack}")
 
     """ -------------------------------- Math Wrapper Functions -------------------------------- """
 
@@ -207,15 +258,15 @@ class Calculator:
                 x = self._convert_to_best_numeric(x)
                 result = x ** 2
                 self.stack_put(result)
-                self._message = f"Function: x^2({x}) = {result}"
+                self._message = f"Function: x²({x}) = {result}"
             except Exception as ex:
                 self.stack_put(x)
                 self._message = f"Error: cant raise x to the power of 2: '{x}' with error: '{ex}'"
                 log(self._message)
                 return
         else:
-            self._message = f"Error: not enough values on the stack to perform the operation: 'x^2'"
-            log(self._message)
+            self._message = f"Error: not enough values on the stack to perform the operation: 'x²'"
+        log(self._message)
 
     def raise_pow_x(self):
         """ raises y to the power of x"""
@@ -229,7 +280,7 @@ class Calculator:
                 y = self._convert_to_best_numeric(y)
                 result = y ** x
                 self.stack_put(result)
-                self._message = f"Function: x^y({x}, {y}) = {result}"
+                self._message = f"Function: xʸ({x}, {y}) = {result}"
             except Exception as ex:
                 self.stack_put(y)
                 self.stack_put(x)
@@ -237,8 +288,8 @@ class Calculator:
                 log(self._message)
                 return
         else:
-            self._message = f"Error: not enough values on the stack to perform the operation: 'x^y'"
-            log(self._message)
+            self._message = f"Error: not enough values on the stack to perform the operation: 'xʸ'"
+        log(self._message)
 
     def raise_pow_e(self):
         """ raises e to the power of x """
@@ -250,15 +301,15 @@ class Calculator:
                 x = self._convert_to_best_numeric(x)
                 result = math.exp(x)
                 self.stack_put(result)
-                self._message = f"Function: e^x({x}) = {result}"
+                self._message = f"Function: eˣ({x}) = {result}"
             except Exception as ex:
                 self.stack_put(x)
                 self._message = f"Error: cant raise e to the power of x: '{x}' with error: '{ex}'"
                 log(self._message)
                 return
         else:
-            self._message = f"Error: not enough values on the stack to perform the operation: 'e^x'"
-            log(self._message)
+            self._message = f"Error: not enough values on the stack to perform the operation: 'eˣ'"
+        log(self._message)
 
     def natural_log(self):
         """ takes the natural log of the value in X """
@@ -278,7 +329,27 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'ln'"
-            log(self._message)
+        log(self._message)
+
+    def log_base_10(self):
+        """ takes the log base 10 of the value in X """
+        self._message = None
+        if len(self._stack) > 0:
+            self._update_stack_history()
+            x = self._stack.pop(0)
+            try:
+                x = self._convert_to_best_numeric(x)
+                result = math.log10(x)
+                self.stack_put(result)
+                self._message = f"Function: log10({x}) = {result}"
+            except Exception as ex:
+                self.stack_put(x)
+                self._message = f"Error: cannot perform function: 'log10' on non-number: '{x}' with error: '{ex}'"
+                log(self._message)
+                return
+        else:
+            self._message = f"Error: not enough values on the stack to perform the operation: 'log'"
+        log(self._message)
 
     def n_choose_r(self):
         """ calculates the number of ways to choose r items from a set of n items where r=x and n=y """
@@ -301,7 +372,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'nCr'"
-            log(self._message)
+        log(self._message)
 
     def n_permutations_r(self):
         """ calculates the number of ways to choose r items from a set of n items where order matters, where r=x and n=y
@@ -325,7 +396,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'nPr'"
-            log(self._message)
+        log(self._message)
 
     def negate_x(self):
         """ negates the value in x """
@@ -345,7 +416,8 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'negate'"
-            log(self._message)
+
+        log(self._message)
 
     def reciprocal_x(self):
         """ takes the reciprocal of the value in X """
@@ -365,7 +437,7 @@ class Calculator:
                 return
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'reciprocal'"
-            log(self._message)
+        log(self._message)
 
     """  -------------------------------- Stack Operations -------------------------------- """
 
@@ -381,7 +453,7 @@ class Calculator:
             self._message = f"Swap: {x} and {y}"
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: 'swap'"
-            log(self._message)
+        log(self._message)
 
     """ -------------------------------------- Plotting ----------------------------------- """
 
@@ -406,8 +478,31 @@ class Calculator:
                 plt.show()
                 self._message = f"Plot shown"
             except Exception as ex:
-                self._message = f"Error: cant show plot with error: '{ex}'"
-                log(self._message)
+                self._message = f"Error: show_plot() cant show plot with error: '{ex}'"
+            log(self._message)
+
+    def show_plots_dict(self, plots: dict, x_label="X", y_label="Y", title="XY plot", grid=True):
+        """ shows a plot of X vs Y, X and Y can be any iterable, like a list or numpy array:
+         :param plots: [dict] of plot objects like {<trace name>: <plots.PlotContainer>, ...}"""
+        self._message = None
+        try:
+            # clear the current figure
+            plt.clf()
+
+            fig, ax = plt.subplots()
+            for name, p in plots.items():
+                p.display_plot(ax, name)
+
+            plt.legend()
+            plt.grid(grid)
+            plt.xlabel(x_label)
+            plt.ylabel(y_label)
+            plt.title(title)
+            plt.show()
+
+        except Exception as ex:
+            self._message = f"Error: show_plots_dict() cant show plot with error: '{ex}'"
+            log(self._message)
 
     def user_entry(self, user_input: any):
         """ Parses the user input string and performs the appropriate action. This method is the primary interface
@@ -544,6 +639,8 @@ class Calculator:
                     raise Exception(self._message)
         else:
             self._message = f"Error: not enough values on the stack to perform the operation: '{self._stack[0]}'"
+
+        log(self._message)
 
     def two_arg_function_press(self, function):
         """ uses the math library to perform a function on the stack value and put the result back on the stack.
@@ -859,6 +956,7 @@ class Calculator:
                         self._message = f"Evaluated: {x_str}{args} to {result}"
                         self.stack_put(result)
                         self._last_stack_operation = 'function'
+                        log(self._message)
                         return  # ----------------------------------------------------------------------------->
                     except Exception as ex:
                         pass  # try the next lib
@@ -885,6 +983,7 @@ class Calculator:
                             self._message = f"Evaluated: {exc_str}{args} to {result}"
                             self.stack_put(result)
                             self._last_stack_operation = 'function'
+                            log(self._message)
                             return  # --------------------------------------------------------------------------------->
                         except Exception as ex:
                             pass # try the next lib
@@ -1039,7 +1138,10 @@ class Calculator:
                     elif operation == '*':
                         result = y * x
                     elif operation == '/':
-                        result = y / x
+                        if x != 0:
+                            result = y / x
+                        else:
+                            result = float('inf')
                     elif operation == '**':
                         result = y ** x
                     else:
@@ -1197,14 +1299,15 @@ class Calculator:
         self._stack = []
 
     def clear_user_functions(self, function_name=None):
-        """ removes the user functions from the namespace and the user functions set """
+        """ removes the user functions from the namespace and the user functions set, if function_name is None
+        all functions will be removed"""
         if function_name is None:
             to_remove = copy(list(self._user_functions.keys()))
         else:
             to_remove = {function_name}
         for func in to_remove:
             try:
-                self._user_functions.pop(func)
+                self._user_functions.pop(func, None)
                 self._exec_globals.pop(func, None)
                 del func
             except Exception as ex:
@@ -1218,7 +1321,6 @@ class Calculator:
         @param clear_first: if True clear the existing locals dictionary before loading the new one
         """
         self._message = None
-        log(f"Load Locals")
         if clear_first:
             self._locals = dict()
         self._locals.update(new_locals)
@@ -1243,17 +1345,19 @@ class Calculator:
 
         self._last_stack_operation = None
 
-    def clear_stack_level(self, level=0):
-        """ clears the stack level, using pop, indexing the stack starts at 0.
-         @param level: the stack level to clear, if level is out of range, the stack is not cleared """
+    def clear_stack_level(self, idx=0) -> any:
+        """ pops the value of the stack at idx, indexing the stack starts at 0.
+         @param idx: the stack level (idx) to clear, if idx is out of range, the stack is not cleared """
         self._update_stack_history()
         self._message = None
-        log(f"Clear Stack Level: {level}")
-        if level < len(self._stack):
-            self._stack.pop(level)
+        ret = None
+        if idx < len(self._stack):
+            ret = self._stack.pop(idx)
+            self._message = f"Clear Stack Level: {idx} value: {ret}"
         else:
-            self._message = f"Error: cannot clear stack level: '{level}', it is out of range"
-            log(self._message)
+            self._message = f"Error: cannot clear stack level: '{idx}', it is out of range"
+        log(self._message)
+        return ret
 
     def clear_all_variables(self):
         """ clears all the local variables """
@@ -1335,7 +1439,7 @@ class Calculator:
         if isinstance(x, str):
             try:
                 val = float(x)
-                if '.' in str(val) or val < 1:
+                if '.' in str(x) or val < 1:
                     # this is explicitly a float, like 34.0, it can be cast to an int but the user has added the .0
                     return val # -------------------------------------------------------------------------------------->
                 else:
@@ -1343,6 +1447,8 @@ class Calculator:
             except Exception as ex:
                 raise ValueError(f"Cannot convert '{x}' to number with error: '{ex}'")
         elif isinstance(x, (int, float)):
+            return x
+        elif isinstance(x, complex):
             return x
         else:
             raise ValueError(f"Error: convert to best numeric, unknown type for x: '{x}'")
@@ -1354,7 +1460,7 @@ class Calculator:
         try:
             exec(function_string, self._exec_globals)
             # get the name of the function
-            function_name = function_string.split(' ')[1].split('(')[0]
+            function_name = function_string.split('def')[1].split('(')[0].strip()
             self._user_functions.update({function_name: function_string})
             self._all_functions.add(function_name)
             self._message = f"Added user function: {function_string}"
@@ -1368,4 +1474,57 @@ class Calculator:
         inverted in the list, so stack[0] will be list[-1] if this setting is True"""
         self._setting_invert_lists = invert_lists
 
+    def load_python_module(self, module_name: str):
+        """ loads functions into user functions, loads classes into the exec_globals, loads module variables into
+         user variables """
 
+        try:
+            exec(f"import {module_name}", self._exec_globals)
+        except Exception as ex:
+            log(f"Failed to import module: '{module_name}' with error: '{ex}'")
+
+        # 'all_functions' is a list of tuples, e.g., [('acos', <built-in function acos>), ...]
+        all_functions = inspect.getmembers(sys.modules[module_name], inspect.isfunction)
+
+        for function in all_functions:
+
+            code = inspect.getsource(function[1])
+            self.add_user_function(code)
+
+        all_variables = {k: v for k, v in inspect.getmembers(sys.modules[module_name]) if not isinstance(v, (types.FunctionType, types.ModuleType)) and not k.startswith("__")}
+
+        self._locals.update(all_variables)
+        log('here')
+
+    def run_eval_on_stack_x(self,):
+        self._update_stack_history()
+        self._message = None
+
+        x_temp = self._stack.pop(0)
+
+        try:
+            result = eval(x_temp, self._exec_globals)  # this works on input like 'np.arrange(10)'
+
+            self._message = f"Evaluated: {x_temp} to {result}"
+            result_type = type(result)
+            result_type_str = str(result_type)
+
+            good = {"<class 'type'>", "<class 'builtin_function_or_method'>", "<class 'function'>"}
+            if result_type_str in good:
+                # in this case the user probably wants to apply the builtin functon to Y
+                Y = self._stack.pop(0)
+                try:
+                    result = eval(x_temp, self._exec_globals)(Y)  # this works on input like 'np.arrange(Y)'
+                    self._message = f"Evaluated: {x_temp}({Y}) to {result}"
+                except Exception as ex:
+                    self._message = f"Error in run_eval_on_stack_x: eval: '{x_temp}({Y})' with exceptions ex: {ex}"
+                    self.stack_put(Y)
+
+            self._last_stack_operation = 'eval'
+            self.stack_put(result)
+
+        except Exception as ex:
+            self._message = f"Error in run_eval_on_stack_x: eval: '{x_temp}' with exceptions ex: {ex}"
+            self.stack_put(x_temp)
+
+        log(self._message)

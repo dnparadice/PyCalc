@@ -1,10 +1,19 @@
+import ast
 import inspect
+import subprocess
 import tkinter as tk
+from tkinter import font as tkfont
 import tkinter.filedialog as filedialog
+import pathlib
 from tkinter import ttk
 from tkinter.ttk import Style
+import numpy as np
+import struct
+import re
+
 from calc import Calculator
 import engnum
+import plots
 
 from copy import copy
 from struct import pack
@@ -28,7 +37,7 @@ class OsType(Enum):
 
 
 class UiFrame(tk.Frame):
-    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this 
+    """ extends the UiFrame class to add a no nonsense flag for indicating if the widget is visible or not in this
     context
 
     Warning, the coverage for self.visible is not complete, it is only set in the pack, pack_forget, and destroy methods
@@ -70,11 +79,10 @@ class CalculatorUiSettings:
         self.eng_format_num_length = 7
         self.integer_format_string = ','
         self.plot_options_string = '-o'
-        self.last_user_function_edit_name = None
 
         # window size and appearance
-        self.stack_rows = 2
-        self.locals_rows = 10
+        self.stack_rows = 5
+        self.locals_rows = 6
 
         self.locals_width_key = 100
         self.locals_width_value = 160
@@ -83,18 +91,20 @@ class CalculatorUiSettings:
         self.stack_value_width = 200
         self.stack_type_width = 50
         self.message_width = 30
+        self.message_height = 5
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
-        self.stack_font = ('Arial', 24)
-        self.locals_font = ('Arial', 12)
-        self.message_font = ('Arial', 12)
-        self.button_font = ('Arial', 12)
+        self.stack_font = ('Default', 15)
+        self.locals_font = ('Default', 15)
+        self.message_font = ('Default', 15)
+        self.button_font = ('Default', 12)
 
         self.ui_visible_state = UiVisibleState.STANDARD
-        self.show_message_field = False
-        self.show_locals_table = False
-        self.show_buttons = False
+        self.show_message_field = True
+        self.show_locals_table = True
+        self.show_buttons = True
+        self.load_on_launch = ['calclibs.eemath']  # list of python modules to load on launch
 
 
 class CalculatorUiState:
@@ -157,43 +167,29 @@ class MainWindow:
         self._menu_bar.add_cascade(label='Edit', menu=self._edit_menu)
         self._view_menu = tk.Menu(self._menu_bar)
         self._menu_bar.add_cascade(label='View', menu=self._view_menu)
-        self._options_menu = tk.Menu(self._menu_bar)
-        self._menu_bar.add_cascade(label='Options', menu=self._options_menu)
+        self._plot_menu = tk.Menu(self._menu_bar)
+        self._menu_bar.add_cascade(label='Plot', menu=self._plot_menu)
+        self._function_menu = tk.Menu(self._menu_bar)
+        self._menu_bar.add_cascade(label='Functions', menu=self._function_menu)
 
         # FILE MENU ........................
 
-        # add a quit option to the file menu
         self._file_menu.add_command(label='Quit', command=self._root.quit)
-
-        # add a 'load state' option to the file menu
         self._file_menu.add_command(label='Load state', command=self.menu_load_state)
-
-        # add a 'save state' option to the file menu
         self._file_menu.add_command(label='Save state', command=self.menu_save_state)
+        self._file_menu.add_checkbutton(label='Save state on exit', onvalue=True, offvalue=False)
+        self._file_menu.add_separator()
+        self._file_menu.add_command(label='Load Python Module', command=self.popup_load_python_module)
 
         # EDIT MENU ........................
 
-        # add a 'undo' option to the edit menu
         self._edit_menu.add_command(label='Undo (ctrl+z)', command=self.undo_last_action)
-
-        # add a 'clear stack' option to the edit menu
         self._edit_menu.add_command(label='Clear stack', command=self.clear_stack)
-
-        # add a 'clear all variables' option to the file menu
+        self._edit_menu.add_separator()
         self._edit_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
 
         # VIEW MENU ........................
 
-        # add a 'show user functions' option to the view menu that opens a popup window
-        self._view_menu.add_command(label='Show user functions', command=self.popup_show_user_functions)
-
-        # add a 'show all functions' option to the view menu that opens a popup window
-        self._view_menu.add_command(label='Show all functions', command=self.popup_show_all_functions)
-
-        # add a seperator line
-        self._view_menu.add_separator()
-
-        # add a 'show message field' option to the view menu
         self._tk_var_menu_view_show_message_field = tk.BooleanVar()
         self._view_menu.add_checkbutton(label='Show message field',
                                         onvalue=True,
@@ -201,7 +197,6 @@ class MainWindow:
                                         variable=self._tk_var_menu_view_show_message_field,
                                         command=self._menu_view_show_message_field, )
 
-        # add a 'show locals table' option to the view menu
         self._tk_var_menu_view_show_locals_table = tk.BooleanVar()
         self._view_menu.add_checkbutton(label='Show locals table',
                                         onvalue=True,
@@ -209,7 +204,6 @@ class MainWindow:
                                         variable=self._tk_var_menu_view_show_locals_table,
                                         command=self._menu_view_show_locals_table, )
 
-        # add a 'show buttons' option to the view menu
         self._tk_var_menu_view_show_buttons = tk.BooleanVar()
         self._view_menu.add_checkbutton(label='Show buttons',
                                         onvalue=True,
@@ -217,45 +211,33 @@ class MainWindow:
                                         variable=self._tk_var_menu_view_show_buttons,
                                         command=self._menu_view_show_buttons, )
 
-        # add a seperator
         self._view_menu.add_separator()
-
-        # add a  'Standard View' option to the view menu
         self._view_menu.add_command(label='Standard View', command=self._apply_standard_view)
-
-        # add a 'Mini View' option to the view menu
         self._view_menu.add_command(label='Mini View', command=self._apply_mini_view)
+        self._view_menu.add_separator()
+        self._view_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
+        self._view_menu.add_command(label='Set font parameters', command=self.popup_set_stack_font_parameters)
+        self._view_menu.add_separator()
+        self._view_menu.add_command(label='Edit numeric display format', command=self.popup_edit_numeric_display_format)
 
-        # OPTIONS MENU ........................
+        # PLOT MENU ............................
 
-        # add a check option to the menu for 'save state on exit'
-        self._options_menu.add_checkbutton(label='Save state on exit', onvalue=True, offvalue=False)
+        self._plot_menu.add_command(label='Plot', command=self.popup_x_plot)
+        self._plot_menu.add_command(label='XY Plot', command=self.popup_xy_plot)
+        self._plot_menu.add_command(label='XYZ Plot', command=self.popup_xyz_plot)
+        self._plot_menu.add_separator()
+        self._plot_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
 
-        # add a separator
-        self._options_menu.add_separator()
+        # Function MENU ............................
 
-        # add an option to "edit the float format string" that calls the method edit_float_format_string
-        self._options_menu.add_command(label='Edit numeric display format', command=self.popup_edit_numeric_display_format)
-
-        # add an option to "edit the plot options string" that calls the method edit_plot_options_string
-        self._options_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
-
-        # add a line separator
-        self._options_menu.add_separator()
-
-        # add an option to open the add function popup window that calls the method popup_add_function
-        self._options_menu.add_command(label='Add function', command=self.popup_add_function)
-
-        # add an option to 'remove user function' that calls the method remove_user_function
-        self._options_menu.add_command(label='Remove function', command=self.popup_remove_user_function)
-
-        # add an option to 'clear all user functions' that calls the method clear_all_user_functions
-        self._options_menu.add_command(label='Clear all functions', command=self.popup_confirm_clear_all_user_functions)
-
-        self._options_menu.add_separator()
-
-        # add option to open the 'function buttons' popup
-        self._options_menu.add_command(label='Function buttons', command=self.popup_function_buttons)
+        self._function_menu.add_command(label='Edit user functions', command=self.popup_edit_user_function)
+        self._function_menu.add_separator()
+        self._function_menu.add_command(label='Show user function buttons', command=self.popup_function_buttons)
+        self._function_menu.add_separator()
+        self._function_menu.add_command(label='Clear all user functions', command=self.popup_confirm_clear_all_user_functions)
+        self._function_menu.add_separator()
+        self._function_menu.add_command(label='Show all functions', command=self.popup_show_all_functions)
+        self._function_menu.add_separator()
 
         # MENU BINDINGS ........................
 
@@ -295,18 +277,21 @@ class MainWindow:
         # add binding for paste from os clipboard
         self._root.bind('<<Paste>>', lambda event: self.paste(self._root.clipboard_get()))
 
-        # add a binding for undo
-        self._root.bind('<Control-z>', lambda event: self.undo_last_action())
-        self._root.bind('<Command-z>', lambda event: self.undo_last_action())
+        # bind double click on locals to insert value to stack at x
+        self._root.bind('<Double-1>', lambda event: self._insert_value_to_stack_at_x())
 
-        # add a binding for save state
-        self._root.bind('<Control-s>', lambda event: self.menu_save_state())
 
         # bind the program exit to the exit method
         self._root.protocol("WM_DELETE_WINDOW", self.user_exit)
 
-        # bind command+c to the copy method
-        self._root.bind('<Command-c>', lambda event: self.copy_stack_value())
+        if self._os_type.name == OsType.MAC:
+            self._root.bind('<Command-c>', lambda event: self.copy_stack_value())
+            self._root.bind('<Command-z>', lambda event: self.undo_last_action())
+            self._root.bind('<Command-s>', lambda event: self.menu_save_state())
+        else: # Windows and other
+            self._root.bind('<Control-c>', lambda event: self.copy_stack_value())
+            self._root.bind('<Control-z>', lambda event: self.undo_last_action())
+            self._root.bind('<Control-s>', lambda event: self.menu_save_state())
 
         """  ----------------------------  Stack, Messages, Locals, Buttons ---------------------------------------  """
 
@@ -333,15 +318,16 @@ class MainWindow:
             self._frame_stack = UiFrame(self._top_frame, background=self._background_color, padx=5, pady=5)
             self._frame_stack.pack(fill='x', expand=True)  # fill='x', expand=True
 
-            # add a table with 10 rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
-            self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type', ))
+            # add a table with (n) rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
+            # self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type', ))
+            self._stack_table = ttk.Treeview(self._frame_stack, columns=('type', 'value', ))
             self._stack_table.heading('#0', text='Index')
-            self._stack_table.heading('value', text='Value')
             self._stack_table.heading('type', text='Type')
+            self._stack_table.heading('value', text='Stack Values')
             self._stack_table.pack(fill='x', expand=True)
 
             # add a graphic line below the stack table
-            ttk.Separator(self._frame_stack, orient='horizontal').pack()
+            ttk.Separator(self._frame_stack, orient='horizontal').pack(padx=10)
 
         # set table number of visible rows
         if number_visible_rows is not None:
@@ -362,11 +348,32 @@ class MainWindow:
         # add right click menu to stack
         self._stack_table.bind(btn, self._right_click_menu_stack_table)
 
+        # ------ Configure the Style of ALL TreeView objects here -------
+
+        # Configure the Treeview style (this will affect all Treeview objects)
+        stack_style = ttk.Style()
+        fnt = self._settings.stack_font[0]  # self._settings.stack_font like: ('Courier New', 19)
+        f_size = self._settings.stack_font[1]
+        f_style = 'normal'  # like: 'bold', 'italic', 'normal'
+        stack_style.configure("Treeview", font=(fnt, f_size, f_style))
+        stack_style.configure("Treeview.Heading", font=('System', 12, f_style))
+
+        # set cell height based on font size
+        stack_style.configure("Treeview", rowheight=f_size + 8)  # add some padding to the font size for row height
+
+        # re-size window to fit all visible elements
+        self.re_draw_main_window_to_fit_all_elements()
+
         self._update_stack_display()
 
-        log(f"Stack Table column width: {self._stack_table.column('value', 'width')}")
+        # print(f"tk fonts: {tkfont.names()}")  # for dev, does not print all fonts loaded onto PC
 
     """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
+
+    def re_draw_main_window_to_fit_all_elements(self):
+        """ re-draws the main window to fit all visible elements """
+        self._root.update_idletasks()
+        self._root.geometry('')  # set to empty string to auto-size to fit all elements
 
 
     @ staticmethod
@@ -411,7 +418,7 @@ class MainWindow:
             self._locals_table['height'] = self._settings.locals_rows
 
             self._locals_table.heading('#0', text='Key', )
-            self._locals_table.heading('value', text='Value')
+            self._locals_table.heading('value', text='Variable Values')
             self._locals_table.column('#0', width=self._settings.locals_width_key)
             self._locals_table.column('value', width=self._settings.locals_width_value)
             self._locals_table.pack(fill='x', expand=True)
@@ -431,6 +438,9 @@ class MainWindow:
             # add right click menu to locals
             self._locals_table.bind(btn, self._right_click_menu_locals_table)
 
+            # re-size window to fit all visible elements
+            self.re_draw_main_window_to_fit_all_elements()
+
             self._update_locals_display()
 
         else:
@@ -449,13 +459,21 @@ class MainWindow:
         # add a line seperator to the menu
         right_click_menu.add_separator()
         # add item: "remove selected item"
-        right_click_menu.add_command(label='Remove selected item', command=self._remove_selected_item_from_locals_table)
+        right_click_menu.add_command(label='Remove selected variable', command=self._remove_selected_item_from_locals_table)
+
+        right_click_menu.add_separator()
+        right_click_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
+
+        right_click_menu.add_separator()
+        right_click_menu.add_command(label='Clear all variables', command=self.menu_clear_all_variables)
+
         right_click_menu.post(event.x_root, event.y_root)
 
     def _right_click_menu_stack_table(self, event):
         """ creates a right click menu for the stack table """
         # create a right click menu
         right_click_menu = tk.Menu(self._root, tearoff=0)
+        right_click_menu.add_command(label='Get Info', command=self._get_stack_value_info)
         right_click_menu.add_command(label='Edit value', command=self._edit_stack_value)
         right_click_menu.add_command(label='Copy Value', command=self.copy_stack_value)
 
@@ -463,6 +481,10 @@ class MainWindow:
         right_click_menu.add_separator()
         # add item: "remove selected item"
         right_click_menu.add_command(label='Clear Stack', command=self.clear_stack)
+        right_click_menu.add_command(label='Clear Selected', command=self.stack_clear_selected)
+
+        right_click_menu.add_separator()
+        right_click_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
 
         right_click_menu.post(event.x_root, event.y_root)
 
@@ -472,10 +494,21 @@ class MainWindow:
         if len(selected) == 0:
             return
         key = self._locals_table.item(selected)['text']
-        value = self._locals_table.item(selected)['values'][0]
+
+        # value = self._locals_table.item(selected)['values'][0]
+        # this does not work because the value returned is a string so for a list you get [1 2 3] instead of [1, 2, 3] as expected
+        # need to grab the actual value from the calculator locals using the key
+
+        locals = self._c.return_locals() # type: dict
+        value = locals.get(key, None)
+        if value is None:
+            self._update_message_display(f"Variable '{key}' not found in locals.")
+            return
         self._c.user_entry(value)
+
         self._update_stack_display()
         self._update_message_display(f"Inserted value at x: {key}={value}")
+        log(f"Inserted value at x: {key}={value}")
 
     def _copy_variable_value(self):
         """ copies the value of the selected item in the locals table to the clipboard """
@@ -504,7 +537,7 @@ class MainWindow:
 
         # create a label to ask the user to edit the value
         label = ttk.Label(window, text=f'Edit the value for: {key}')
-        label.pack()
+        label.pack(padx=10)
 
         # create a text entry field
         entry = ttk.Entry(window)
@@ -523,19 +556,24 @@ class MainWindow:
             window.destroy()
 
         # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_value).pack()
+        ttk.Button(window, text='OK', command=apply_value).pack(padx=10)
+        # bind enter press to apply_value
+        entry.bind('<Return>', lambda event: apply_value())
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
+
+        entry.focus()
 
     def _remove_selected_item_from_locals_table(self):
         """ removes the selected item from the locals table """
         selected = self._locals_table.selection()
         if len(selected) == 0:
             return
-        key = self._locals_table.item(selected)['text']
-        value = self._locals_table.item(selected)['values'][0]
-        self._c.delete_local(key)
+        for item in selected:
+            key = self._locals_table.item(item)['text']
+            value = self._locals_table.item(item)['values'][0]
+            self._c.delete_local(key)
         self._update_locals_display()
         self._update_message_display()
 
@@ -545,7 +583,7 @@ class MainWindow:
         if len(selected) == 0:
             return
         key = self._stack_table.item(selected)['text']
-        value = self._stack_table.item(selected)['values'][0]
+        value = self._stack_table.item(selected)['values'][1]
         self.popup_edit_stack_value(key, value)
 
     def popup_edit_stack_value(self, key, value):
@@ -556,12 +594,13 @@ class MainWindow:
 
         # create a label to ask the user to edit the value
         label = ttk.Label(window, text=f'Edit the value for: {key}')
-        label.pack()
+        label.pack(padx=10)
 
         # create a text entry field
         entry = ttk.Entry(window)
         entry.insert(0, value)
         entry.pack(expand=True, fill='x')
+
 
         def apply_value():
             new_value = entry.get()
@@ -579,10 +618,14 @@ class MainWindow:
         entry.bind('<Return>', lambda event: apply_value())
 
         # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_value).pack()
+        ttk.Button(window, text='OK', command=apply_value).pack(padx=10)
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
+
+        # set focus to entry
+        entry.focus()
+
 
     def _set_visibility_buttons(self, state: bool):
         """ sets the visibility of the buttons based on the state """
@@ -615,6 +658,12 @@ class MainWindow:
         else:
             pass # do this at the end of the method too to destroy the buttons
 
+        # set font
+        fnt = self._settings.button_font[0]
+        f_size = self._settings.button_font[1]
+        f_style = 'normal'  # like: 'bold', 'italic', 'normal
+        ttk.Style().configure("TButton", font=(fnt, f_size, f_style))
+
         # Numeric buttons --------------------------------
 
         # ttk buttons ane not the same across OS, need to adjust the width of the buttons
@@ -630,7 +679,7 @@ class MainWindow:
         if self._settings.show_buttons is True:
             # create a frame for the math buttons
             self._numeric_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
-            numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '+/-']
+            numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '±']
 
 
             # arrange the buttons on a grid in a standard calculator layout
@@ -641,7 +690,7 @@ class MainWindow:
                            width=2+button_width_mod,
                            ).grid(row=i // 3, column=i % 3,)
 
-            self._numeric_buttons.pack()
+            self._numeric_buttons.pack(padx=10)
 
         else:
             exists = hasattr(self, '_numeric_buttons')
@@ -653,8 +702,8 @@ class MainWindow:
         if self._settings.show_buttons is True:
             # create a frame for the calc buttons
             self._calc_buttons = UiFrame(self._right_frame, background=self._background_color, padx=5, pady=5)
-            calc_buttons = ['delete', 'clear', 'x<->y', '1/x', 'enter', ]
-            more_buttons = ['x^2', 'x^y', 'e^x', 'pi', 'euler']
+            calc_buttons = ['delete', 'clear', 'x⟷y', '1/x', 'enter', ]
+            more_buttons = ['x²', 'xʸ', 'eˣ', 'π', 'ℇ']
 
             # arrange the buttons on a grid with the calc buttons on the right and the more buttons on the left
             for i, button in enumerate(more_buttons):
@@ -663,13 +712,15 @@ class MainWindow:
                            command=lambda btn=button: self.button_press(btn),
                            width=5+button_width_mod,
                            ).grid(row=i, column=0)
+
             for i, button in enumerate(calc_buttons):
                 ttk.Button(self._calc_buttons,
                            text=button,
                            command=lambda btn=button: self.button_press(btn),
                            width=5+button_width_mod,
                            ).grid(row=i, column=1)
-            self._calc_buttons.pack()
+
+            self._calc_buttons.pack(padx=10)
         else:
             exists = hasattr(self, '_calc_buttons')
             if exists:
@@ -680,7 +731,7 @@ class MainWindow:
         if self._settings.show_buttons is True:
             # create a frame for operation buttons
             self._operation_buttons = UiFrame(self._left_frame, background=self._background_color, padx=5, pady=5)
-            operations = {'sqrt': 'sqrt', 'sin': 'sin', 'cos': 'cos', 'tan': 'tan', 'log': 'log10', 'ln': 'ln', }
+            operations = {'√': 'sqrt', 'sin': 'sin', 'cos': 'cos', 'tan': 'tan', 'log': 'log10', 'ln': 'ln', }
 
             # arrange the buttons on a grid in a standard calculator layout
             indexs = range(len(operations))
@@ -693,7 +744,7 @@ class MainWindow:
                            command=lambda btn=button: self.button_press(btn),
                            ).grid(row=i // 2, column=i % 2)
 
-            self._operation_buttons.pack()
+            self._operation_buttons.pack(padx=10)
         else:
             exists = hasattr(self, '_operation_buttons')
             if exists:
@@ -705,6 +756,12 @@ class MainWindow:
             # create a frame for the special buttons
             self._special_buttons = UiFrame(self._left_frame, background=self._background_color, padx=5, pady=5)
             # place to the right of the numeric buttons
+
+            # set font for all buttons in special buttons frame
+            fnt = self._settings.button_font[0]
+            f_size = self._settings.button_font[1]
+            f_style = 'normal'  # like: 'bold', 'italic', 'normal
+            set_font = (fnt, f_size, f_style)
 
             # create a button for 'stack to list'
             ttk.Button(self._special_buttons,
@@ -742,7 +799,8 @@ class MainWindow:
                        command=lambda: self.show_plot(),
                        ).pack(fill='x')
 
-            self._special_buttons.pack()
+            self._special_buttons.pack(padx=10)
+
         else:
             exists = hasattr(self, '_special_buttons')
             if exists:
@@ -761,16 +819,29 @@ class MainWindow:
             if exists:
                 self._bottom_button_frame.destroy()
 
+        # re-size window to fit all visible elements
+        self.re_draw_main_window_to_fit_all_elements()
+
     def _set_visibility_message_field(self, state: bool):
         """ sets the visibility of the message field based on the state """
         if state is True:
             # add a field at the bottom for text messages
-            self._message_field = tk.Text(self._top_frame, state='normal', height=2, font=self._settings.message_font)
+            self._message_field = tk.Text(self._top_frame,
+                                          state='normal',
+                                          height=self._settings.message_height,)
+            # set the font with settings
+            fnt = self._settings.message_font[0]
+            f_size = self._settings.message_font[1]
+            f_style = 'normal'  # like: 'bold', 'italic', 'normal'
+            self._message_field.config(font=(fnt, f_size, f_style))
+
             # set width with settings
             self._message_field.config(width=self._settings.message_width)
             self._message_field.pack(expand=True, fill='x', padx=3)
             self._settings.show_message_field = True
             self._tk_var_menu_view_show_message_field.set(True)
+            # re-size window to fit all visible elements
+            self.re_draw_main_window_to_fit_all_elements()
             self._update_message_display()
         else:
             exists = hasattr(self, '_message_field')
@@ -811,29 +882,107 @@ class MainWindow:
 
         # create a label to ask the user if they are sure
         label = ttk.Label(window, text='Are you sure you want to clear all user functions?')
-        label.pack()
+        label.pack(padx=10)
 
         def clear_all_user_functions():
             self._c.clear_user_functions()
             window.destroy()
 
         # create a button to confirm the clear all user functions
-        ttk.Button(window, text='OK', command=clear_all_user_functions).pack()
+        ttk.Button(window, text='OK', command=clear_all_user_functions).pack(padx=10)
 
         # create a button to cancel the clear all user functions
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
-        
-    def popup_remove_user_function(self):
-        """ popup that has a list of user functions and a button to remove the selected function """
-        # create a new window
-        window = tk.Toplevel(self._root)
-        window.title('Remove User Function')
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
-        # create a list box to show the user functions
-        list_box = tk.Listbox(window, height=10, width=50)
-        for key in self._c.return_user_functions().keys():
-            list_box.insert('end', key)
-        list_box.pack()
+
+    def popup_edit_user_function(self):
+        """opens a popup window that has a list of functions thhat when clicked displayes the function in a text field"""
+        # create a new window
+
+        # -------- Local Methods for Popup Edit User Functions --------
+
+        def on_search_var_change(*args):
+            search_text = search_var.get().lower()
+            list_box.delete(0, 'end')
+            for key in self._c.return_user_functions().keys():
+                if search_text in key.lower():
+                    list_box.insert('end', key)
+
+
+        def update_list_box(_in=None, ):
+            current_selection = list_box.curselection()
+
+            list_box.delete(0, 'end')
+            for key in self._c.return_user_functions().keys():
+                list_box.insert('end', key)
+
+            # set to previous current selection
+            if current_selection:
+                list_box.selection_set(current_selection)
+                show_function()
+
+        def show_function(_in=None):
+            selected = list_box.curselection()
+            if len(selected) == 0:
+                return
+            key = list_box.get(selected)
+            function_string = self._c.return_user_functions().get(key, '')
+            function_field.delete('1.0', tk.END)
+            function_field.insert('end', function_string)
+
+        def save_changes():
+            """ saves the changes made to the function """
+            try:
+                selected = list_box.curselection()
+                if len(selected) == 0:
+                    return
+                func_str = function_field.get('1.0', tk.END)
+                self._c.add_user_function(func_str)
+            except Exception as ex:  # open a popup with the exception
+                message = f"Exception saving function: {ex}"
+                # open a simple text popup displaying the message
+                popup = tk.Toplevel(self._root)
+                popup.title('Warning')
+                label = ttk.Label(popup, text=message)
+                label.pack(padx=5, pady=5)
+                ttk.Button(popup, text='OK', command=popup.destroy).pack(padx=5, pady=5)
+
+        def add_function():
+            """ opens a popup to add a function """
+            self.popup_add_function(cb_method=update_list_box)
+            # clear the list box
+            list_box.delete(0, 'end')
+            update_list_box()
+
+        def to_stack(exe=False):
+            """ add the selected function to the stack, if exe is True then also execute the function after adding to stack """
+            # grab selected
+            selected = list_box.curselection()
+            if len(selected) == 0:
+                return
+
+            k = list_box.get(selected)
+            if exe is False:
+
+                self._c.user_entry(k)
+                self._update_stack_display()
+
+            else:
+                x = self._c.return_stack_for_display(0)
+
+                # if you just typed a number it may be a string in stack[0], convert it by enter press
+                if isinstance(x, str):
+                    self._c.enter_press()
+                self._c.user_entry(k)
+                self._c.enter_press()
+                self._update_stack_display()
+                self._update_message_display()
+
+            # set focus to the main window
+            self._root.focus_set()
+
+        def run_now():
+            to_stack(exe=True)
 
         def remove_user_function():
             selected = list_box.curselection()
@@ -841,67 +990,161 @@ class MainWindow:
                 return
             key = list_box.get(selected)
             self._c.clear_user_functions(key)
-            window.destroy()
+            update_list_box()
 
-        # create a button to remove the selected function
-        ttk.Button(window, text='Remove', command=remove_user_function).pack()
+        def edit_in_idle(widget_in: tk.Text):
+            """ opens an """
 
-        # create a button to cancel the remove function
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+            # grab all the text
+            selected_text = widget_in.get("1.0", tk.END)
 
-    def popup_add_function(self, function_string=None, parent_object=None):
+            window_text = ("# edit the function below, save and close the window to update the "
+                           "function in the calculator \n") + selected_text
+
+            with open("temp.py", "w") as f:
+                f.write(window_text)
+
+            subprocess.run(["python3", "-m", "idlelib.idle", "temp.py"])
+
+            with open("temp.py", "r") as f:
+                new_text = f.read()
+                # remove first line if it starts with "# edit the function below"
+                if new_text.startswith("# edit the function below"):
+                    new_text = new_text.split("\n", 1)[1]
+
+            # update the text widget with the new text
+            widget_in.delete("1.0", tk.END)
+            widget_in.insert("1.0", new_text)
+
+            # remove the temp file
+            subprocess.run(["rm", "temp.py"])
+
+        # ------- build the popup window --------
+
+        window = tk.Toplevel(self._root)
+        window.title('Edit User Function')
+
+
+        # create a search field to search for functions
+        search_var = tk.StringVar()
+        # set default search var to: type here to search
+        search_var.set('search')
+        search_entry = ttk.Entry(window, textvariable=search_var)
+        search_entry.pack(fill='x', padx=5, pady=5)
+        search_var.trace_add('write', on_search_var_change)
+
+
+        # create a list box to show the user functions
+        list_box = tk.Listbox(window, height=10, width=75)
+        for key in self._c.return_user_functions().keys():
+            list_box.insert('end', key)
+        list_box.pack(expand=True, fill='both', padx=5, pady=5)
+
+        # create a text filed to display the selected function
+        function_field = tk.Text(window, height=25, width=50)
+        function_field.pack(expand=True, fill='both', padx=5, pady=5)
+
+
+
+        # selecting the listbox in any way shows the function
+        # list_box.bind('<Double-1>', show_function)
+        # list_box.bind('<Button-1>', show_function)
+        list_box.bind('<<ListboxSelect>>', show_function)
+
+        # add some buttons
+        # ttk.Button(window, text='Cancel', command=window.destroy).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Edit in Idle', command=lambda: edit_in_idle(function_field)).pack(side='right', padx=5, pady=5)
+        ttk.Button(window, text='Add Functon', command=add_function).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Remove Function', command=remove_user_function).pack(side='left',padx=5, pady=5)
+        ttk.Button(window, text='Save Changes', command=save_changes).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='To Stack', command=to_stack).pack(side='left', padx=5, pady=5)
+        ttk.Button(window, text='Run', command=run_now).pack(side='left', padx=5, pady=5)
+
+
+    def popup_add_function(self, function_string=None, parent_object=None, cb_method=None):
         """ opens a popup window to add a function to the calculator """
-        # create a new window
-        if parent_object is None:
-            parent = self._root
-        else:
-            parent = parent_object
-        window = tk.Toplevel(parent)
-        window.title('Add Function')
 
-        # create a text entry field
-        entry = tk.Text(window, height=25, width=50)
         if function_string is None:
-            default_text = 'def sqr_x(x):\n    return x**2'
-            txt = self._c.return_user_functions().get(self._settings.last_user_function_edit_name, default_text)
-            entry.insert('1.0', txt)
+            input_txt = "# write your function below, save and close to window to add the function to the calculator \n "
         else:
-            entry.insert('1.0', function_string)
-        entry.focus()
-        entry.pack()
+            input_txt = function_string
 
-        def apply_function():
-            function_string = entry.get('1.0', 'end')
+        with open("temp.py", "w") as f:
+            f.write(input_txt)
+
+        subprocess.run(["python3", "-m", "idlelib.idle", "temp.py"])
+
+        with open("temp.py", "r") as f:
+            function_string = f.read()
+
+            # remove the first line if it starts with "# write your function below"
+            if function_string.startswith("# write your function below"):
+                function_string = function_string.split("\n", 1)[1]
+
             try:
                 self._c.add_user_function(function_string)
             except Exception as ex:
                 message = f"Error adding function: {ex}"
+
+                # open popup with the message
+                popup = tk.Toplevel(self._root)
+                popup.title('Error Adding Function')
+                ttk.Label(popup, text=message).pack(padx=10, pady=10)
+                ttk.Button(popup, text='OK', command=popup.destroy).pack(padx=10, pady=10)
+                ttk.Button(popup, text='Edit', command=lambda: self.popup_add_function(function_string)).pack(padx=10, pady=10)
+
                 self._update_message_display(message)
             else:
-                self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
-                window.destroy()
+                if cb_method is not None:
+                    cb_method()
 
-        # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_function).pack()
 
-        # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        # remove the temp file
+        subprocess.run(["rm", "temp.py"])
 
-    def popup_show_user_functions(self):
-        """ opens a popup window to show the user defined functions """
-        # create a new window
-        window = tk.Toplevel(self._root)
-        window.title('User Functions')
 
-        # create a text entry field
-        entry = tk.Text(window, height=42, width=50)
-        func_dict = self._c.return_user_functions_for_display()
-        for key, value in func_dict.items():
-            entry.insert('end', f"Name: '{key}':\n{value}____________________________________________\n")
-        entry.pack()
 
-        # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
+        # # create a new window
+        # if parent_object is None:
+        #     parent = self._root
+        # else:
+        #     parent = parent_object
+        # window = tk.Toplevel(parent)
+        # window.title('Add Function')
+        #
+        # # create a text entry field
+        # entry = tk.Text(window, height=25, width=50)
+        # if function_string is None:
+        #     default_text = 'def sqr_x(x):\n    return x**2'
+        #     txt = self._c.return_user_functions().get(self._settings.last_user_function_edit_name, default_text)
+        #     entry.insert('1.0', txt)
+        # else:
+        #     entry.insert('1.0', function_string)
+        # entry.focus()
+        #
+        # # let the text area expand with the window
+        # entry.pack(expand=True, fill='both')
+        #
+        # def apply_function():
+        #     function_string = entry.get('1.0', 'end')
+        #     try:
+        #         self._c.add_user_function(function_string)
+        #     except Exception as ex:
+        #         message = f"Error adding function: {ex}"
+        #         self._update_message_display(message)
+        #     else:
+        #         self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
+        #         if cb_method is not None:
+        #             cb_method()
+        #         window.destroy()
+        #
+        # # create a button to save the changes, bind the enter press to the ok button function
+        # ttk.Button(window, text='OK', command=apply_function).pack(padx=10)
+        # entry.bind('<Return>', lambda event: apply_function())
+        #
+        # # create a button to cancel the changes
+        # ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
+
 
     def popup_show_all_functions(self):
         """ opens a popup window to show the all functions available to the calculator """
@@ -929,13 +1172,13 @@ class MainWindow:
         scroll.pack(side='right', fill='y')
         entry.config(yscrollcommand=scroll.set)
         scroll.config(command=entry.yview)
-        entry.pack()
+        entry.pack(expand=True, fill='both')
 
         # add a numeric filed at the bottom of the window that shows the number of functions
-        ttk.Label(window, text=f"Number of functions: {len(func_dict)}").pack()
+        ttk.Label(window, text=f"Number of functions: {len(func_dict)}").pack(padx=10)
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Close', command=window.destroy).pack()
+        ttk.Button(window, text='Close', command=window.destroy).pack(padx=10)
 
     def popup_function_buttons(self):
         """ opens a popup window to show the all user functions available to the calculator """
@@ -945,7 +1188,7 @@ class MainWindow:
 
         # create a frame for the function buttons
         frame = UiFrame(window, background=self._background_color, padx=5, pady=5)
-        frame.pack()
+        frame.pack(padx=10)
 
         # create a button for each function
         func_dict = self._c.return_user_functions()
@@ -958,7 +1201,162 @@ class MainWindow:
                            ).pack(fill='x')
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Close', command=window.destroy).pack()
+        ttk.Button(window, text='Close', command=window.destroy).pack(padx=10)
+
+    # add popup to set the font name and size for the stack and variable tables
+    def popup_set_stack_font_parameters(self):
+        """ open a popup in which you can set the UiSettings variables for the stack font name and size in the UI """
+        window = tk.Toplevel(self._root)
+        window.title('Set Stack Font Parameters')
+        window.geometry('320x120')
+        window.resizable(False, False)
+
+        frm = ttk.Frame(window, padding=8)
+        frm.pack(expand=True, fill='both')
+
+        ttk.Label(frm, text='Font Name:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
+        font_name_entry = ttk.Entry(frm, width=20)
+        font_name_entry.insert(0, str(self._settings.stack_font[0]))
+        font_name_entry.grid(row=0, column=1, sticky='w', padx=4, pady=4)
+
+        ttk.Label(frm, text='Font Size:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
+        font_size_entry = ttk.Entry(frm, width=8)
+        font_size_entry.insert(0, str(self._settings.stack_font[1]))
+        font_size_entry.grid(row=1, column=1, sticky='w', padx=4, pady=4)
+
+        def apply_values():
+            new_font_name = font_name_entry.get()
+            try:
+                new_font_size = int(font_size_entry.get())
+                if new_font_size < 1:
+                    raise ValueError('Font size must be >= 1')
+            except Exception as ex:
+                self._update_message_display(f"Invalid font size: {ex}")
+                return
+
+            # apply to settings
+            self._settings.stack_font = (new_font_name, new_font_size)
+            self._settings.message_font = (new_font_name, new_font_size)
+            self._settings.locals_font = (new_font_name, new_font_size)
+            self._settings.button_font = (new_font_name, 12)
+
+            # update stack table font
+            self._update_visible_ui_object_stack(self._settings.stack_rows)
+            self._update_stack_display()
+
+            # update the fonts for each section if visible
+            if self._settings.show_message_field is True:
+                self._set_visibility_message_field(False) # toggle visibility to update font on screen
+                self._set_visibility_message_field(True)
+
+            if self._settings.show_locals_table is True:
+                self._set_visibility_locals_table(False)
+                self._set_visibility_locals_table(True)
+
+            if self._settings.show_buttons is True:
+                self._set_visibility_buttons(False)
+                self._set_visibility_buttons(True)
+
+            self._update_message_display(f"Applied new stack font: {new_font_name} size {new_font_size}")
+
+            window.destroy()
+
+        # Buttons
+        btn_frame = ttk.Frame(frm)
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=10)
+        ttk.Button(btn_frame, text='OK', command=apply_values).pack(side='left', padx=6)
+        ttk.Button(btn_frame, text='Cancel', command=window.destroy).pack(side='left', padx=6)
+        # Enter key = apply
+        window.bind('<Return>', lambda e: apply_values())
+        font_name_entry.focus()
+
+
+    def popup_set_stack_message_vars_height(self):
+        """ open a popup in which you can set the UiSettings variables for the stack height, the message height and the
+        variables height in the UI """
+        window = tk.Toplevel(self._root)
+        window.title('Set Stack / Message / Locals Heights')
+        window.geometry('320x180')
+        window.resizable(False, False)
+
+        frm = ttk.Frame(window, padding=8)
+        frm.pack(expand=True, fill='both')
+
+        ttk.Label(frm, text='Stack row count:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
+        stack_entry = ttk.Entry(frm, width=8)
+        stack_entry.insert(0, str(self._settings.stack_rows))
+        stack_entry.grid(row=0, column=1, sticky='w', padx=4, pady=4)
+
+        ttk.Label(frm, text='Locals row count:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
+        locals_entry = ttk.Entry(frm, width=8)
+        locals_entry.insert(0, str(self._settings.locals_rows))
+        locals_entry.grid(row=1, column=1, sticky='w', padx=4, pady=4)
+
+        ttk.Label(frm, text='Message row height:').grid(row=2, column=0, sticky='w', padx=4, pady=4)
+        message_entry = ttk.Entry(frm, width=8)
+        message_entry.insert(0, str(self._settings.message_height))
+        message_entry.grid(row=2, column=1, sticky='w', padx=4, pady=4)
+
+        def apply_values():
+            try:
+                new_stack = int(stack_entry.get())
+                new_locals = int(locals_entry.get())
+                new_message = int(message_entry.get())
+                if new_stack < 1 or new_locals < 1 or new_message < 1:
+                    raise ValueError('Values must be >= 1')
+            except Exception as ex:
+                self._update_message_display(f"Invalid value: {ex}")
+                return
+
+            # apply to settings
+            self._settings.stack_rows = new_stack
+            self._settings.locals_rows = new_locals
+            self._settings.message_height = new_message
+
+            # update stack table height (this method will set the Treeview height)
+            try:
+                self._update_visible_ui_object_stack(number_visible_rows=new_stack)
+            except Exception:
+                # fallback: directly set property if UI exists
+                if hasattr(self, '_stack_table'):
+                    self._stack_table['height'] = new_stack
+
+            # recreate locals table if visible
+            if self._settings.show_locals_table:
+                if hasattr(self, '_frame_locals'):
+                    try:
+                        self._frame_locals.destroy()
+                    except Exception:
+                        pass
+                # _set_visibility_locals_table will recreate with the new locals_rows
+                self._set_visibility_locals_table(True, number_of_visible_rows=new_locals)
+
+            # recreate message field if visible
+            if self._settings.show_message_field:
+                if hasattr(self, '_message_field'):
+                    try:
+                        self._message_field.destroy()
+                    except Exception:
+                        pass
+                self._set_visibility_message_field(True)
+
+            # refresh displays
+            self._update_stack_display()
+            self._update_locals_display()
+            self._update_message_display(
+                f"Applied new sizes: stack={new_stack}, locals={new_locals}, message={new_message}")
+
+            window.destroy()
+
+        # Buttons
+        btn_frame = ttk.Frame(frm)
+        btn_frame.grid(row=4, column=0, columnspan=2, pady=10)
+        ttk.Button(btn_frame, text='OK', command=apply_values).pack(side='left', padx=6)
+        ttk.Button(btn_frame, text='Cancel', command=window.destroy).pack(side='left', padx=6)
+
+        # Enter key = apply
+        window.bind('<Return>', lambda e: apply_values())
+        stack_entry.focus()
 
     def _popup_function_button_press(self, function: str):
         """ this method gets bound to the function buttons in the popup window """
@@ -968,6 +1366,8 @@ class MainWindow:
         self._update_stack_display()
         self._update_message_display()
         self._update_locals_display()
+        # set focus to the main window
+        self._root.focus_set()
 
     def _load_settings_on_launch(self):
         """ looks for the settings file 'last_state_autosave' in the local directory and loads it if the user has
@@ -991,13 +1391,79 @@ class MainWindow:
                 log(f"applied settings from file: {self._autosave_path}")
         except Exception as ex:
             self._update_message_display(f"Error loading settings on launch: {ex}")
+            log(f"Error loading settings from file: {self._autosave_path}")
+
+        try:
+            for lib in self._settings.load_on_launch:
+                self._c.load_python_module(lib)
+        except Exception as ex:
+            self._update_message_display(f"Error loading module on launch: {ex}")
+            log(f"Error loading module on launch: {ex}")
+
 
     def user_exit(self):
         """ exits the program, saves the state if the settings are set to save state on exit """
         if self._settings.save_state_on_exit:
+            pth = pathlib.Path(self._autosave_path)
+            if not pth.exists():
+                # create the file
+                # get currnet directory
+                my_dir = pathlib.Path.cwd()
+                pth = my_dir / 'last_state_autosave.pycalc'
+                pth.touch(exist_ok=True)
+                self._autosave_path = str(pth)
             self.menu_save_state(save_path=self._autosave_path)
             log(f"clean exit")
         self._root.quit()
+
+    def _get_stack_value_info(self):
+        """ bound to the right click menu to get info on the selected stack item
+        gets info from the selected stack item and displays it in the message field """
+        try:
+            selected = self._stack_table.selection()
+            if len(selected) == 0:
+                return
+            sel = self._stack_table.item(selected)
+            idx = sel['text']
+            value = self._c.return_stack_for_display(int(idx)) # is the actual type, not a string
+            if isinstance(value, str):
+                info = f'"INFO: {value}, len: {len(value)}, bytes: {str(value).encode()}"'
+            elif isinstance(value, int):
+                info = f"INFO: {value}, bytes: {int(value).to_bytes(byteorder="big")}, big-endian "
+            elif isinstance(value, float):
+                info = f"INFO: {value}, bytes: {struct.pack('>d', value)}, big-endian "
+            elif isinstance(value, np.ndarray):
+                se = value # type: np.ndarray
+                info = (f"INFO: [{float(se[0])}, ... , {float(se[-1])}] "
+                                      f"shape: {se.shape}, dtype: {se.dtype}, max: {se.max():0.3f}, "
+                                      f"min: {se.min():0.3f}, mean: {se.mean():0.3f}, sum: {se.sum():0.3f}")
+                calc = self._c
+                calc.user_entry(f"array_min={se.min():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_max={se.max():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_mean={se.mean():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_stddev={se.std():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_sum={se.sum():0.3f}")
+                calc.enter_press()
+                calc.user_entry(f"array_length={len(se)}")
+                calc.enter_press()
+                self._update_locals_display()
+            elif isinstance(value, list):
+                entry_type = type(value[0])
+                if entry_type is int or entry_type is float:
+                    sm = sum(value)
+                    mean = sm / len(value)
+                    info = (f"INFO: {value}, len: {len(value)}, type: {entry_type}, max: {max(value):0.3f}, min: {min(value):0.3f}, "
+                            f"mean: {mean:0.3f}, sum: {sm:0.3f}")
+            else:
+                info = f"INFO: {value}, type: {type(value)}"
+        except Exception as ex:
+            info = f"Error getting info on stack item: {ex}"
+
+        self._update_message_display(info)
 
     def copy_stack_value(self):
         """ copies the value of the selected stack item to the clipboard """
@@ -1009,6 +1475,18 @@ class MainWindow:
         value = self._c.return_stack_for_display(int(idx))
         self._root.clipboard_clear()
         self._root.clipboard_append(value)
+
+    def stack_clear_selected(self):
+        """ clears the selected value from the stack """
+        selected = self._stack_table.selection()
+        if len(selected) == 0:
+            return
+        sel = self._stack_table.item(selected)
+        idx = sel['text']
+        popped = self._c.clear_stack_level(int(idx))
+        self._update_stack_display()
+        msg = f"Cleared stack level {idx} value: {popped}"
+        self._update_message_display(msg)
 
     def undo_last_action(self):
         self._c.undo_last_action()
@@ -1022,12 +1500,559 @@ class MainWindow:
         self._update_stack_display()
         self._update_locals_display()
 
+    def popup_x_plot(self):
+        """ applies the plot options and closes the window """
+        plots_dict = dict()
+        len_str = ' ('
+
+        def get_trace_key_from_svar(svar: tk.StringVar):
+            """ returns the trace key from the StringVar """
+            return svar.get().split(len_str)[0].strip()
+
+        def clear_plots():
+            plots_dict.clear()
+
+
+        def plot_y():
+            """ applies the plot options and closes the window """
+            y = get_trace_key_from_svar(y_svar)
+            locals = self._c.return_locals()
+            Y = locals.get(y, None)
+            X = list(range(len(Y)))
+            if X is None or Y is None:
+                self._update_message_display(f"Error: '{y}' not found in locals.")
+                return
+
+            new_plot = plots.XyPlotContainer(X,
+                                  Y,
+                                  name=plot_label.get(),
+                                  color=color_svar.get(),
+                                  line_style=line_style_svar.get(),
+                                  marker=marker_svar.get(),
+                                  linewidth=2,
+                                  markersize=3,
+                                  alpha=1.0,
+                                  grid=grid_svar.get(),
+                                  xlabel='data points',
+                                  ylabel=get_trace_key_from_svar(y_svar),)
+
+            plots_dict.update({trace_label.get(): new_plot})
+            self._c.show_plots_dict(plots_dict)
+            self._update_message_display()
+
+        # create a new window
+        window = tk.Toplevel(self._root)
+        window.title('Y Plot Options')
+        # make window dimensions 800 by 600
+        window.geometry('400x400')
+
+        # crete grid manager for the popup2
+        window.grid_rowconfigure(0, weight=1)
+        window.grid_columnconfigure(0, weight=1)
+        window.grid_propagate(False)  # prevent the window from resizing to fit the content
+        # create a label to ask the user to select the x and y variables
+
+        row = 0
+        ttk.Label(window, text='Define the plot parameters').grid(row=row, column=0, padx=5, pady=10)
+
+        # grab all the locals that are lists or arrays
+        locals = self._c.return_locals()
+        local_arrays = {key: value for key, value in locals.items() if isinstance(value, (list, np.ndarray))}
+        local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
+
+        row = 1
+        # x_svar = tk.StringVar(window)
+        # x_svar.set(local_array_keys[0])  # set default value to the first key
+        # x_combo = ttk.Combobox(window, values=local_array_keys, textvariable=x_svar)
+        # x_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+        ttk.Label(window, text='The X values are 0 to len(Y)').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+        row = 2
+        y_svar = tk.StringVar(window)
+        y_svar.set(local_array_keys[0])
+        y_combo = ttk.Combobox(window, values=local_array_keys, textvariable=y_svar)
+        y_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+        ttk.Label(window, text='Select Y').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+        row = 3  # create text entry for trace label
+        ttk.Label(window, text='Trace Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        trace_label = ttk.Entry(window)
+        trace_label.insert(0, 'Trace 1')
+        trace_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+        row = 4  # create a text field for the plot label
+        ttk.Label(window, text='Plot Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        plot_label = ttk.Entry(window)
+        plot_label.insert(0, 'Y Plot')
+        plot_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+        row = 6  # create a option menu to select the plot color
+        ttk.Label(window, text='Plot Color').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        color_options = ['blue', 'red', 'green', 'black', 'orange', 'purple', 'brown']
+        color_svar = tk.StringVar(window)
+        color_svar.set(color_options[0])  # set default value to the first option
+        color_combo = ttk.Combobox(window, values=color_options, textvariable=color_svar)
+        color_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+        row = 8  # create an option menu to select the plot marker
+        ttk.Label(window, text='Plot Marker').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        marker_options = ['o', '', 'x', 's', '^', 'd', '*']
+        marker_svar = tk.StringVar(window)
+        marker_svar.set(marker_options[0])  # set default value to the first option
+        marker_combo = ttk.Combobox(window, values=marker_options, textvariable=marker_svar)
+        marker_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+        row = 9  # create an option menu to select the plot line style
+        ttk.Label(window, text='Plot Line Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        line_style_options = ['-', '', '--', '-.', ':']
+        line_style_svar = tk.StringVar(window)
+        line_style_svar.set(line_style_options[0])  # set default value to the
+        line_style_combo = ttk.Combobox(window, values=line_style_options, textvariable=line_style_svar)
+        line_style_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+        row = 10  # create a button to select grid on/off
+        ttk.Label(window, text='Grid').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+        grid_svar = tk.BooleanVar(window, value=True)  # default to True
+        grid_check = ttk.Checkbutton(window, variable=grid_svar, onvalue=True, offvalue=False)
+        grid_check.grid(row=row, column=0, padx=10, pady=4, sticky='e')
+
+        row = 10
+        ttk.Button(window, text='Add Plot', command=plot_y).grid(row=row, column=0, padx=10, pady=10, sticky='w')
+
+        row = 11
+        # create a button to save the changes
+        ttk.Button(window, text='Clear Plots', command=clear_plots).grid(row=row, column=0, padx=10, pady=10, sticky='w')
+
+        # create a button to cancel the changes
+        ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10, sticky='e')
+
+    def popup_xy_plot(self):
+            """ opens a popup window to show the xy plot options """
+
+            # create a new window
+            window = tk.Toplevel(self._root)
+            window.title('XY Plot Options')
+            # make window dimensions 800 by 600
+            window.geometry('400x500')
+
+            # grab all the locals that are lists or arrays
+            plots_dict = dict()
+            len_str = ' ('
+            lcls = self._c.return_locals()
+            local_arrays = {key: value for key, value in lcls.items() if isinstance(value, (list, np.ndarray))}
+            local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
+
+            if len(local_arrays) < 1:
+                local_array_keys = ['No arrays defined']
+
+            # crete grid manager for the popup
+            window.grid_rowconfigure(0, weight=1)
+            window.grid_columnconfigure(0, weight=1)
+            window.grid_propagate(False)  # prevent the window from resizing to fit the content
+            # create a label to ask the user to select the x and y variables
+
+
+
+            # setup the StringVars for the comboboxes
+            x_svar = tk.StringVar(window) #  like: 'name'
+            y_svar = tk.StringVar(window) # like: 'name'
+            x_svar.set(local_array_keys[0])  # set default value to the first key
+            y_svar.set(local_array_keys[0])
+            x_combo = ttk.Combobox(window, values=local_array_keys, textvariable=x_svar)
+            y_combo = ttk.Combobox(window, values=local_array_keys, textvariable=y_svar)
+
+
+
+
+            def update_trace_label_to_selected_y(selected):
+                # get the current selected y variable and set the trace label to it
+                y = get_trace_key_from_svar(y_svar)
+                trace_label.delete(0, 'end')
+                trace_label.insert(0, y)
+
+            y_combo.bind("<<ComboboxSelected>>", update_trace_label_to_selected_y)
+
+            trace_label = ttk.Entry(window)
+            plot_label = ttk.Entry(window)
+            x_axis_name_entry = ttk.Entry(window)
+            x_axis_name_entry.insert(0, 'X Axis')
+            y_axis_name_entry = ttk.Entry(window)
+            y_axis_name_entry.insert(0, 'Y Axis')
+
+            color_svar = tk.StringVar(window)   # like: 'blue', 'red', etc.
+            marker_svar = tk.StringVar(window) # like 'o', 'x', etc.
+            line_style_svar = tk.StringVar(window) # like '-', '--', etc.
+            grid_svar = tk.BooleanVar(window, value=True)  # display grid? default to True
+
+
+
+
+            def build_window_widgets():
+
+                row = 0 # the rows define the order the widgets are drawn
+                ttk.Label(window, text='Define the plot parameters').grid(row=row, column=0, padx=5, pady=10)
+
+                row = 1  # create a text field for the plot label
+                ttk.Label(window, text='Plot Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+                plot_label.insert(0, 'XY Plot')
+                plot_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+                # plot x and y axis names
+                row = 2
+                ttk.Label(window, text='X Axis Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+                x_axis_name_entry.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+                row = 3
+                ttk.Label(window, text='Y Axis Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+                y_axis_name_entry.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+                row = 4
+                # insert a seperator line
+                sep = ttk.Separator(window, orient='horizontal')
+                sep.grid(row=row, column=0, columnspan=2, sticky='ew', padx=10, pady=10)
+
+                row = 5
+                x_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+                ttk.Label(window, text='Select X').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+                row = 6
+                y_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+                ttk.Label(window, text='Select Y').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+                row = 7  # create text entry for trace label
+                ttk.Label(window, text='Trace Label').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+                trace_label.insert(0, 'Trace 1')
+                trace_label.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+
+                row = 8  # create a option menu to select the plot color
+                ttk.Label(window, text='Trace Color').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+                color_options = ['blue', 'red', 'green', 'black', 'orange', 'purple', 'brown']
+                color_svar.set(color_options[0])  # set default value to the first option
+                color_combo = ttk.Combobox(window, values=color_options, textvariable=color_svar)
+                color_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+                row = 9  # create an option menu to select the plot marker
+                ttk.Label(window, text='Trace Marker').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+                marker_options = ['o', '', 'x', 's', '^', 'd', '*']
+                marker_svar.set(marker_options[0])  # set default value to the first option
+                marker_combo = ttk.Combobox(window, values=marker_options, textvariable=marker_svar)
+                marker_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+                row = 10  # create an option menu to select the plot line style
+                ttk.Label(window, text='Trace Line Style').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+                line_style_options = ['-', '', '--', '-.', ':']
+                line_style_svar.set(line_style_options[0])  # set default value to the
+                line_style_combo = ttk.Combobox(window, values=line_style_options, textvariable=line_style_svar)
+                line_style_combo.grid(row=row, column=0, padx=10, pady=4, sticky='w')
+
+                row = 11  # create a button to select grid on/off
+                ttk.Label(window, text='Grid').grid(row=row, column=1, padx=10, pady=4, sticky='w')
+
+                grid_check = ttk.Checkbutton(window, variable=grid_svar, onvalue=True, offvalue=False)
+                grid_check.grid(row=row, column=0, padx=10, pady=4, sticky='e')
+
+                row = 11
+                ttk.Button(window, text='Add Trace (show plot)', command=plot_xy).grid(row=row, column=0, padx=10, pady=10,
+                                                                          sticky='w')
+                row = 12
+                # create a button to save the changes
+                ttk.Button(window, text='Clear Traces', command=clear_plots).grid(row=row, column=0, padx=10, pady=10,
+                                                                                 sticky='w')
+                # button to update list boxes
+                ttk.Button(window, text='Update Lists', command=update_list_boxes).grid(row=row, column=0,
+                                                                                          padx=10, pady=10,
+                                                                                          sticky='e')
+
+
+                # create a button to cancel the changes
+                ttk.Button(window, text='Cancel', command=window.destroy).grid(row=row, column=1, padx=10, pady=10,
+                                                                               sticky='e')
+
+                update_trace_label_to_selected_y(None)
+
+            def get_trace_key_from_svar(svar: tk.StringVar):
+                """ returns the trace key from the StringVar """
+                return svar.get().split(len_str)[0].strip()
+
+            def clear_plots():
+                plots_dict.clear()
+
+            def plot_xy():
+                """ applies the plot options and closes the window """
+                x = get_trace_key_from_svar(x_svar)
+                y = get_trace_key_from_svar(y_svar)
+                locals = self._c.return_locals()
+                X = locals.get(x, None)
+                Y = locals.get(y, None)
+                if X is None or Y is None:
+                    self._update_message_display(f"Error: '{x}' or '{y}' not found in locals.")
+                    return
+
+                new_plot = plots.XyPlotContainer(X,
+                                      Y,
+                                      name=plot_label.get(),
+                                      color=color_svar.get(),
+                                      line_style=line_style_svar.get(),
+                                      marker=marker_svar.get(),
+                                      linewidth=2,
+                                      markersize=3,
+                                      alpha=1.0,
+                                      grid=grid_svar.get(),
+                                      xlabel=get_trace_key_from_svar(x_svar),
+                                      ylabel=get_trace_key_from_svar(y_svar),)
+
+                plots_dict.update({trace_label.get(): new_plot})
+                title = plot_label.get()
+                self._c.show_plots_dict(plots_dict,
+                                        title=title,
+                                        x_label=x_axis_name_entry.get(),
+                                        y_label=y_axis_name_entry.get(),
+                                        grid=grid_svar.get(),)
+                self._update_message_display()
+
+
+
+            def update_list_boxes():
+                # grab all the locals that are lists or arrays
+                lcls = self._c.return_locals()
+                local_arrays = {key: value for key, value in lcls.items() if isinstance(value, (list, np.ndarray))}
+                local_array_keys = [f'{key}{len_str}{len(value)})' for key, value in local_arrays.items()]
+                x_combo['values'] = local_array_keys
+                y_combo['values'] = local_array_keys
+
+            build_window_widgets()
+
+
+
+    def popup_xyz_plot(self):
+        """ opens a popup window to show the xyz plot options """
+        pass
+
+    def popup_load_python_module(self):
+        """ opens a popup window to load a python module into the calculator """
+        window = tk.Toplevel(self._root)
+        window.title('Load Python Module')
+        window.geometry('550x300')
+
+        modules = self._settings.load_on_launch
+
+        # add text label
+        ttk.Label(window, text='These modules are loaded on launch').pack(padx=10, pady=5)
+
+        # create a list box containing the modules to load on launch
+        listbox = tk.Listbox(window, height=5)
+        for mod in modules:
+            listbox.insert('end', mod)
+        listbox.pack(padx=10, pady=10, fill='both', expand=True)
+
+        def add_module():
+            """ adds a module to the list box """
+            module_name = module_entry.get().strip()
+            if module_name == '':
+                return
+            try:
+                self._c.load_python_module(module_name)
+                if module_name not in modules:
+                    modules.append(module_name)
+                    listbox.insert('end', module_name)
+                self._update_message_display(f"Loaded module: {module_name}")
+            except Exception as ex:
+                self._update_message_display(f"Error loading module '{module_name}': {ex}")
+
+        def remove_module():
+            """ removes the selected module from the list box """
+            selected = listbox.curselection()
+            if not selected:
+                return
+            index = selected[0]
+            module_name = listbox.get(index)
+            if module_name in modules:
+                modules.remove(module_name)
+            listbox.delete(index)
+            self._update_message_display(f"Removed module: {module_name}")
+
+        # set width to expand with window
+
+        module_entry = ttk.Entry(window, width=200,)
+        module_entry.insert(0, "<enter module name or path>")
+        module_entry.pack(padx=10, pady=5, expand=True)
+
+        add_button = ttk.Button(window, text='Add Module', command=add_module)
+        add_button.pack(padx=10, pady=5, side='left')
+        remove_button = ttk.Button(window, text='Remove Selected Module', command=remove_module)
+        remove_button.pack(padx=10, pady=5, side='right')
+
+
+    def str_to_numpy_array_simple(self, s: str, dtype = float, delimiter = None) -> np.ndarray:
+        """
+        Parse a string into a NumPy array.
+
+        Rules / behavior:
+        - If `delimiter` is provided, split fields by that delimiter (preserves empty fields).
+        - If `delimiter` is None, the function detects a delimiter in the first non-empty line:
+          prefers '\t', then ',', then ';'. If none are found, it uses whitespace rules.
+        - When using whitespace (no explicit delimiter found):
+          - If at least one non-empty line contains multiple whitespace-separated tokens,
+            the string is treated as a 2D table (each line -> a row, tokens split on whitespace).
+          - Otherwise the entire string is treated as a flat list of values (global whitespace split)
+            and a 1D array is returned (this is the change to support newline-separated values).
+        - Empty fields become np.nan (so numeric dtype can be preserved).
+        - Rows with different column counts are padded with np.nan to form a rectangular 2D array.
+        - Tries to cast to `dtype` (default float); if casting fails for some cells it will fallback to float
+          or to an object array.
+        """
+        if s is None:
+            return np.array([])
+
+        # Normalize input and lines
+        lines = s.splitlines()
+
+        # find first non-empty line for delimiter detection
+        first_non_empty = next((ln for ln in lines if ln.strip()), None)
+
+        chosen = delimiter
+        if chosen is None and first_non_empty is not None:
+            if '\t' in first_non_empty:
+                chosen = '\t'
+            elif ',' in first_non_empty:
+                chosen = ','
+            elif ';' in first_non_empty:
+                chosen = ';'
+            else:
+                chosen = None  # use whitespace rules below
+
+        # If we have an explicit delimiter (or detected tab/comma/semicolon), parse as a table
+        if chosen is not None:
+            parsed_rows = []
+            for ln in lines:
+                if ln.strip() == '':
+                    continue
+                tokens = [t.strip() for t in ln.split(chosen)]
+                row = []
+                for tok in tokens:
+                    if tok == '':
+                        row.append(np.nan)
+                    else:
+                        if dtype is not None:
+                            try:
+                                row.append(dtype(tok))
+                                continue
+                            except Exception:
+                                pass
+                        try:
+                            row.append(float(tok))
+                        except Exception:
+                            row.append(tok)
+                parsed_rows.append(row)
+
+            if not parsed_rows:
+                return np.array([])
+
+            max_cols = max(len(r) for r in parsed_rows)
+            for r in parsed_rows:
+                if len(r) < max_cols:
+                    r.extend([np.nan] * (max_cols - len(r)))
+
+            try:
+                arr = np.array(parsed_rows, dtype=dtype)
+            except Exception:
+                try:
+                    arr = np.array(parsed_rows, dtype=float)
+                except Exception:
+                    arr = np.array(parsed_rows, dtype=object)
+
+            # Flatten single-row or single-column to 1D
+            if arr.ndim == 2 and (arr.shape[0] == 1 or arr.shape[1] == 1):
+                return arr.flatten()
+            return arr
+
+        # No explicit delimiter -> whitespace rules:
+        # Decide whether to treat as 2D table (per-line rows) or as a single flat list.
+        # If any non-empty line has more than one whitespace-separated token, treat as 2D.
+        non_empty_lines = [ln for ln in lines if ln.strip() != '']
+        line_token_counts = [len(re.split(r'\s+', ln.strip())) for ln in non_empty_lines]
+        treat_as_2d = any(count > 1 for count in line_token_counts)
+
+        if not non_empty_lines:
+            return np.array([])
+
+        if treat_as_2d:
+            # parse per-line into rows (whitespace splits), keeping per-line structure
+            parsed_rows = []
+            for ln in non_empty_lines:
+                tokens = re.split(r'\s+', ln.strip())
+                row = []
+                for tok in tokens:
+                    if tok == '':
+                        row.append(np.nan)
+                    else:
+                        if dtype is not None:
+                            try:
+                                row.append(dtype(tok))
+                                continue
+                            except Exception:
+                                pass
+                        try:
+                            row.append(float(tok))
+                        except Exception:
+                            row.append(tok)
+                parsed_rows.append(row)
+
+            max_cols = max(len(r) for r in parsed_rows)
+            for r in parsed_rows:
+                if len(r) < max_cols:
+                    r.extend([np.nan] * (max_cols - len(r)))
+
+            try:
+                arr = np.array(parsed_rows, dtype=dtype)
+            except Exception:
+                try:
+                    arr = np.array(parsed_rows, dtype=float)
+                except Exception:
+                    arr = np.array(parsed_rows, dtype=object)
+
+            if arr.ndim == 2 and (arr.shape[0] == 1 or arr.shape[1] == 1):
+                return arr.flatten()
+            return arr
+
+        else:
+            # Treat the whole input as a flat list of tokens separated by any whitespace (this handles newline-separated values)
+            tokens = re.split(r'\s+', ' '.join(non_empty_lines).strip())
+            vals = []
+            for tok in tokens:
+                if tok == '':
+                    continue
+                if dtype is not None:
+                    try:
+                        vals.append(dtype(tok))
+                        continue
+                    except Exception:
+                        pass
+                try:
+                    vals.append(float(tok))
+                except Exception:
+                    vals.append(tok)
+            try:
+                return np.array(vals, dtype=dtype)
+            except Exception:
+                try:
+                    return np.array(vals, dtype=float)
+                except Exception:
+                    return np.array(vals, dtype=object)
+
     def paste(self, value):
         """ handles pasting from the clipboard """
         if isinstance(value, str):
-            if '\n' in value: # go ahead and split the string into lines
+            if '\t' in value:  # tab delimited string, likely from a
+                array = self.str_to_numpy_array_simple(value, delimiter='\t')
+                self._c.stack_put(array)
+
+            elif '\n' in value: # go ahead and split the string into lines
                 lines = value.split('\n')
-                tags = {'def', 'class'}
+
+                tags = {'def', 'class'} # for when you paste a function or class definition
                 for tag in tags:
                     if tag in lines[0]:
                         for line in lines:
@@ -1035,11 +2060,27 @@ class MainWindow:
                         self.enter_press()
                         break
                 else:  # tag not found
-                    self.button_press(str(lines))
-                    self.enter_press()
+
+                    try:
+                        # remove empty lines
+                        lines = [float(line.replace(',', '')) for line in lines if line.strip() != '']
+
+                        # if its a number, lets make it a numpy array
+                        if isinstance(lines[0], float | int):
+                            self.button_press(str(lines))
+                            self.enter_press()
+                            self.button_press('np.array')
+                        else:
+                            self.button_press(str(lines))
+
+                        self.enter_press()
+
+                    except Exception as ex:
+                        raise Exception (f"Error evaluating pasted value: {ex}")
 
             else:
                 self.button_press(str(value))
+                self.enter_press()
 
         self._update_stack_display()
         self._update_message_display()
@@ -1116,7 +2157,7 @@ class MainWindow:
         # create a checkbox to toggle scientific notation
         c_button = ttk.Checkbutton(window, text='Use Engineering Notation', variable=use_eng_notation_tk, onvalue=True, offvalue=False,
                                    command=apply_eng_notation, name='eng_notation')
-        c_button.pack()
+        c_button.pack(padx=10)
 
 
         # add text below the checkbox that says: 'If use engineering notation is checked, the format string will be ignored'
@@ -1146,11 +2187,15 @@ class MainWindow:
         window = tk.Toplevel(self._root)
         window.title('Edit Plot Options String')
 
+        # create a text indicator
+        ttk.Label(window, text='Plot Options String for simple plots').pack(padx=10)
+
+
         # create a text entry field
         entry = ttk.Entry(window)
         entry.insert(0, self._settings.plot_options_string)
         entry.focus()
-        entry.pack()
+        entry.pack(pady=10)
 
         def apply_plot_options_string():
             self._settings.plot_options_string = entry.get()
@@ -1179,7 +2224,7 @@ class MainWindow:
         entry.insert(0, self._settings.integer_format_string)
         # make the focus be on the entry field
         entry.focus()
-        entry.pack()
+        entry.pack(padx=10)
 
         def apply_integer_format_string():
             self._settings.integer_format_string = entry.get()
@@ -1192,16 +2237,10 @@ class MainWindow:
                 window.destroy()
 
         # create a button to save the changes
-        ttk.Button(window, text='OK', command=apply_integer_format_string).pack()
+        ttk.Button(window, text='OK', command=apply_integer_format_string).pack(padx=10)
 
         # create a button to cancel the changes
-        ttk.Button(window, text='Cancel', command=window.destroy).pack()
-
-    def _apply_ui_settings(self, settings: CalculatorUiSettings):
-        """ applies the settings to the ui """
-        # todo : this needs work, when called on launch the objects dont exist yet, need to change the order of operations
-        msg = f"Apply Settings on a live window is not implemented yet"
-        log(msg)
+        ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
 
     def menu_save_state(self, save_path=None):
         """ saves the locals stack and settings to a file of the users choice
@@ -1209,12 +2248,17 @@ class MainWindow:
          """
         # open a file dialog to save the state
         file_extension = ".pycalc"
+
+        save_path = pathlib.Path(save_path)
+        if not save_path.exists():
+            save_path = None
+
         if save_path is None:
             file = filedialog.asksaveasfile(mode='wb', defaultextension=file_extension)
             if file is None:
                 return
         else:
-            if not save_path.endswith(file_extension):
+            if not str(save_path).endswith(file_extension):
                 save_path += file_extension
             file = open(save_path, 'wb')
         calc_state = CalculatorUiState()
@@ -1223,12 +2267,16 @@ class MainWindow:
         calc_state.functions = self._c.return_user_functions()
         calc_state.settings = copy(self._settings)
 
+
+
         calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
         calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
         calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
 
-        calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
-        calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
+        if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
+
+            calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
+            calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
 
         #todo: need to figure out how to get the width to save it.
         calc_state.settings.message_width = 30
@@ -1272,8 +2320,7 @@ class MainWindow:
                 setattr(incoming, key, getattr(latest, key))
 
             self._settings = incoming
-            self._apply_ui_settings(self._settings)
-            log(f"loaded settings: {calc_state.settings}")
+
         try:
             if calc_state.functions is not None:
                 for key, value in calc_state.functions.items():
@@ -1318,6 +2365,12 @@ class MainWindow:
     # define a method for button pushes that take a string as an argument and calls self._c.user_entry
     def button_press(self, input: str):
         self._c.user_entry(input)
+        self._update_stack_display()
+        self._update_message_display()
+        self._update_locals_display()
+
+    def button_eval_x(self):
+        self._c.run_eval_on_stack_x()
         self._update_stack_display()
         self._update_message_display()
         self._update_locals_display()
@@ -1403,7 +2456,8 @@ class MainWindow:
             self._stack_table.insert('',
                                      'end',
                                      text=f"{stack_index}",
-                                     values=(stack_entry_string, entry_type))
+                                     values=(entry_type, stack_entry_string),
+                                     )
 
     def _update_message_display(self, direct_message=None):
         """ updates the message field with the message from the calculator, you
@@ -1414,17 +2468,20 @@ class MainWindow:
         UI context messages to the user
         """
         if self._settings.show_message_field is True:
-            self._message_field.config(state='normal')
-            self._message_field.delete('1.0', 'end')
+            try:
+                self._message_field.config(state='normal')
+                self._message_field.delete('1.0', 'end')
 
-            if direct_message is not None:
-                self._message_field.insert('1.0', direct_message)
-            else:
-                msg = self._c.return_message()
-                if msg is not None:
-                    self._message_field.insert('1.0', msg)
+                if direct_message is not None:
+                    self._message_field.insert('1.0', direct_message)
+                else:
+                    msg = self._c.return_message()
+                    if msg is not None:
+                        self._message_field.insert('1.0', msg)
 
-            self._message_field.config(state='normal')
+                self._message_field.config(state='normal')
+            except Exception as ex:
+                log(f"Error updating message display: {ex}")
 
     def _update_locals_display(self):
         if self._settings.show_locals_table is True:
