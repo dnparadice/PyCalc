@@ -1004,7 +1004,7 @@ class MainWindow:
             with open("temp.py", "w") as f:
                 f.write(window_text)
 
-            subprocess.run(["python3", "-m", "idlelib.idle", "temp.py"])
+            self.open_file_in_idle_ide("temp.py")
 
             with open("temp.py", "r") as f:
                 new_text = f.read()
@@ -1072,7 +1072,24 @@ class MainWindow:
         with open("temp.py", "w") as f:
             f.write(input_txt)
 
-        subprocess.run(["python3", "-m", "idlelib.idle", "temp.py"])
+        try:
+            self.open_file_in_idle_ide("temp.py")
+        except Exception as ex:
+                message = f"Error opening idle: {ex}"
+                # open popup with the message
+                popup = tk.Toplevel(self._root)
+                popup.title('Error Opening Idle')
+                ttk.Label(popup, text=message).pack(padx=10, pady=10)
+                ttk.Button(popup, text='OK', command=popup.destroy).pack(padx=10, pady=10)
+                ttk.Button(popup, text='Edit Here', command=lambda: self.popup_add_function(function_string)).pack(padx=10, pady=10)
+
+                # remove the file, check if exists first to avoid recursion errors
+                fp = pathlib.Path("temp.py")
+                if fp.exists():
+                    subprocess.run(["rm", "temp.py"])
+                self._update_message_display(message)
+                log(f"Error opening idle: {ex}")
+                return
 
         with open("temp.py", "r") as f:
             function_string = f.read()
@@ -1098,53 +1115,8 @@ class MainWindow:
                 if cb_method is not None:
                     cb_method()
 
-
         # remove the temp file
         subprocess.run(["rm", "temp.py"])
-
-
-
-        # # create a new window
-        # if parent_object is None:
-        #     parent = self._root
-        # else:
-        #     parent = parent_object
-        # window = tk.Toplevel(parent)
-        # window.title('Add Function')
-        #
-        # # create a text entry field
-        # entry = tk.Text(window, height=25, width=50)
-        # if function_string is None:
-        #     default_text = 'def sqr_x(x):\n    return x**2'
-        #     txt = self._c.return_user_functions().get(self._settings.last_user_function_edit_name, default_text)
-        #     entry.insert('1.0', txt)
-        # else:
-        #     entry.insert('1.0', function_string)
-        # entry.focus()
-        #
-        # # let the text area expand with the window
-        # entry.pack(expand=True, fill='both')
-        #
-        # def apply_function():
-        #     function_string = entry.get('1.0', 'end')
-        #     try:
-        #         self._c.add_user_function(function_string)
-        #     except Exception as ex:
-        #         message = f"Error adding function: {ex}"
-        #         self._update_message_display(message)
-        #     else:
-        #         self._settings.last_user_function_edit_name = function_string.split('(')[0].split(' ')[1]
-        #         if cb_method is not None:
-        #             cb_method()
-        #         window.destroy()
-        #
-        # # create a button to save the changes, bind the enter press to the ok button function
-        # ttk.Button(window, text='OK', command=apply_function).pack(padx=10)
-        # entry.bind('<Return>', lambda event: apply_function())
-        #
-        # # create a button to cancel the changes
-        # ttk.Button(window, text='Cancel', command=window.destroy).pack(padx=10)
-
 
     def popup_show_all_functions(self):
         """ opens a popup window to show the all functions available to the calculator """
@@ -2501,6 +2473,18 @@ class MainWindow:
         """ launches the main window by calling the Tk mainloop method """
         self._root.mainloop()
 
+    @staticmethod
+    def open_file_in_idle_ide(path: str):
+        fp = pathlib.Path(path)
+        if fp.exists():
+            try:
+                subprocess.run(["python3", "-m", "idlelib.idle", path])
+            except Exception as ex:
+                try:
+                    subprocess.run(["python", "-m", "idlelib.idle", path])
+                except Exception as ex:
+                    message = f"Error opening idle: {ex}"
+                    raise Exception(message)
 
 
 
