@@ -2239,42 +2239,36 @@ class MainWindow:
         # open a file dialog to save the state
         file_extension = ".pycalc"
 
-        save_path = pathlib.Path(save_path)
-        if not save_path.exists():
-            save_path = None
-
         if save_path is None:
-            file = filedialog.asksaveasfile(mode='wb', defaultextension=file_extension)
+            file = filedialog.asksaveasfile(mode='wb', defaultextension=file_extension, initialdir=self._autosave_path)
             if file is None:
                 return
-        else:
-            if not str(save_path).endswith(file_extension):
-                save_path += file_extension
-            file = open(save_path, 'wb')
-        calc_state = CalculatorUiState()
-        calc_state.stack = self._c.return_stack_for_display()
-        calc_state.locals = self._c.return_locals()
-        calc_state.functions = self._c.return_user_functions()
-        calc_state.settings = copy(self._settings)
+
+            else:
+                calc_state = CalculatorUiState()
+                calc_state.stack = self._c.return_stack_for_display()
+                calc_state.locals = self._c.return_locals()
+                calc_state.functions = self._c.return_user_functions()
+                calc_state.settings = copy(self._settings)
 
 
 
-        calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
-        calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
-        calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
+                calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
+                calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
+                calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
 
-        if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
+                if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
 
-            calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
-            calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
+                    calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
+                    calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
 
-        #todo: need to figure out how to get the width to save it.
-        calc_state.settings.message_width = 30
+                #todo: need to figure out how to get the width to save it.
+                calc_state.settings.message_width = 30
 
-        pkl_dump = pickle.dumps(calc_state)
-        file.write(pkl_dump)
-        file.close()
-        log(f"saved state to file: {save_path}")
+                pkl_dump = pickle.dumps(calc_state)
+                file.write(pkl_dump)
+                file.close()
+                log(f"saved state to file: {save_path}")
 
     def menu_load_state(self):
         """ loads the settings and state from a file of the users choice """
