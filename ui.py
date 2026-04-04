@@ -2,6 +2,7 @@ import ast
 import inspect
 import subprocess
 import tkinter as tk
+from locale import currency
 from tkinter import font as tkfont
 import tkinter.filedialog as filedialog
 import pathlib
@@ -183,6 +184,9 @@ class MainWindow:
 
         # EDIT MENU ........................
 
+        self._edit_menu.add_command(label='Copy (ctrl+c)', command=self.copy_stack_value)
+        self._edit_menu.add_command(label='Paste (ctrl+v)', command=self._paste_wrapper_no_args)
+        self._edit_menu.add_separator()
         self._edit_menu.add_command(label='Undo (ctrl+z)', command=self.undo_last_action)
         self._edit_menu.add_command(label='Clear stack', command=self.clear_stack)
         self._edit_menu.add_separator()
@@ -280,7 +284,6 @@ class MainWindow:
         # bind double click on locals to insert value to stack at x
         self._root.bind('<Double-1>', lambda event: self._insert_value_to_stack_at_x())
 
-
         # bind the program exit to the exit method
         self._root.protocol("WM_DELETE_WINDOW", self.user_exit)
 
@@ -365,10 +368,6 @@ class MainWindow:
         self.re_draw_main_window_to_fit_all_elements()
 
         self._update_stack_display()
-
-        # print(f"tk fonts: {tkfont.names()}")  # for dev, does not print all fonts loaded onto PC
-
-    """ ----------------------------  END __init__ and constructors ----------------------------------------------- """
 
     def re_draw_main_window_to_fit_all_elements(self):
         """ re-draws the main window to fit all visible elements """
@@ -2014,49 +2013,68 @@ class MainWindow:
                 except Exception:
                     return np.array(vals, dtype=object)
 
+    def _paste_wrapper_no_args(self):
+        self.paste(self._root.clipboard_get())
+
     def paste(self, value):
         """ handles pasting from the clipboard """
-        if isinstance(value, str):
-            if '\t' in value:  # tab delimited string, likely from a
-                array = self.str_to_numpy_array_simple(value, delimiter='\t')
-                self._c.stack_put(array)
+        try:
+            if isinstance(value, str):
+                # check for and remove currency symbols
+                currency_symbols = ['$', '€', '£', '¥', '₹']
+                for sym in currency_symbols:
+                    if sym in value:
+                        value = value.replace(sym, '')
 
-            elif '\n' in value: # go ahead and split the string into lines
-                lines = value.split('\n')
 
-                tags = {'def', 'class'} # for when you paste a function or class definition
-                for tag in tags:
-                    if tag in lines[0]:
-                        for line in lines:
-                            self.button_press(str(line))
-                        self.enter_press()
-                        break
-                else:  # tag not found
+                if '\t' in value:  # tab delimited string, likely from a
+                    array = self.str_to_numpy_array_simple(value, delimiter='\t')
+                    self._c.stack_put(array)
 
-                    try:
-                        # remove empty lines
-                        lines = [float(line.replace(',', '')) for line in lines if line.strip() != '']
+                elif '\n' in value: # go ahead and split the string into lines
+                    lines = value.split('\n')
 
-                        # if its a number, lets make it a numpy array
-                        if isinstance(lines[0], float | int):
-                            self.button_press(str(lines))
+                    tags = {'def', 'class'} # for when you paste a function or class definition
+                    for tag in tags:
+                        if tag in lines[0]:
+                            for line in lines:
+                                self.button_press(str(line))
                             self.enter_press()
-                            self.button_press('np.array')
-                        else:
-                            self.button_press(str(lines))
+                            break
+                    else:  # tag not found
 
-                        self.enter_press()
+                        try:
+                            # remove empty lines
+                            lines = [float(line.replace(',', '')) for line in lines if line.strip() != '']
 
-                    except Exception as ex:
-                        raise Exception (f"Error evaluating pasted value: {ex}")
+                            # if its a number, lets make it a numpy array
+                            if isinstance(lines[0], float | int):
+                                self.button_press(str(lines))
+                                self.enter_press()
+                                self.button_press('np.array')
+                            else:
+                                self.button_press(str(lines))
 
-            else:
-                self.button_press(str(value))
-                self.enter_press()
+                            self.enter_press()
 
-        self._update_stack_display()
-        self._update_message_display()
-        self._update_locals_display()
+                        except Exception as ex:
+                            raise Exception (f"Error evaluating pasted value: {ex}")
+
+                else:
+                    self.button_press(str(value))
+                    self.enter_press()
+
+                msg = "Pasted value: " + str(self._c.return_stack_for_display(0))
+
+            self._update_stack_display()
+            self._update_locals_display()
+
+        except Exception as ex:
+            msg = f"Error processing pasted value: {ex}"
+
+
+        self._update_message_display(msg)
+
 
     def popup_edit_numeric_display_format(self):
         """ opens a popup window to edit the format of displayed numerics """
