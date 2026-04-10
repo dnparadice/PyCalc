@@ -21,7 +21,7 @@ So this project was born and has become a go-to tool for daily engineering math 
 
 <img src="media/PyCalc-minimode2.png" alt="mini mode" width="250" height="Auto">
 
-### Highlights
+## Highlights
 
 #### General
 - [x] Feature filled RPN calculator with user functions, variables, plotting, and history.
@@ -42,10 +42,39 @@ in an RPN style stack. For example as shown in the first picture, if you have an
 integer at stack position 1 you can press * and the calculator will multiply the array by the integer and put the result at
 stack position 0.
 
-### Intended Users
-- People that want a really powerful calculator 
-- Engineers that need to do calculations using saved variables, functions, and libraries 
-- Python developers 
+## New Features
+
+### April 2026
+
+#### Improved User Functions
+
+<img src="media/PyCalc-edit_user_function-20260321.jpg" alt="calculator and plot" width="auto" height="auto">
+
+By navigating to **Functions -> Edit User Functions** you can now see all user functions in memory, edit them in a text 
+editor, and save changes. Additionally, there are buttons to load the function to the stack and run the function 
+directly from the popup. This makes it much easier to interact with user functions and use them in the calculator. Also
+you can now edit user functions in the idle editor. 
+
+**search:** Use this field to find text in the user function names.
+
+**Save Changes:** Only saves the changes that are currently in the text edit window.
+
+**To Stack:** Puts the function onto the stack so that you can enter arguments by typing them in.
+
+**Run:** Runs the function directly using the current values in the stack and saved user/local variables. 
+
+### October 2025
+
+#### User Libraries
+
+You can now load any library on launch. 
+
+<img src="media/PyCalc-load_user_lib-20251004.jpg" alt="calculator and plot" width="500" height="auto">
+
+Navigate to **File -> Load Pythion Module** enter an installed python module or a local module as shown above.
+Any module on the list will be loaded the next time the calculator launches.
+You can load modules during runtime as well using this window.  
+The list of modules to load is saved with the calculator state. 
 
 ### How to install and launch the calculator
 As of now the calculator is a Python script that can be run from the command line or your IDE of choice. 

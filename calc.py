@@ -1495,7 +1495,7 @@ class Calculator:
         all_variables = {k: v for k, v in inspect.getmembers(sys.modules[module_name]) if not isinstance(v, (types.FunctionType, types.ModuleType)) and not k.startswith("__")}
 
         self._locals.update(all_variables)
-        log('here')
+        log(f"loaded module: '{module_name}'")
 
     def run_eval_on_stack_x(self,):
         self._update_stack_history()
