@@ -384,8 +384,11 @@ class MainWindow:
             if item.cget('label') == label:
                 return item
 
-    def _set_visibility_locals_table(self, state: bool, number_of_visible_rows=10):
-        """ sets the visibility of the locals table based on the state """
+    def _set_visibility_locals_table(self, state: bool, number_of_visible_rows=None):
+        """ sets the visibility of the locals table based on the state
+        :param state: bool, True to show the locals table, False to hide the locals table
+        :param number_of_visible_rows: None, if None uses settings else uses number passed
+        """
         if state is True:
             self._settings.show_locals_table = True
             self._tk_var_menu_view_show_locals_table.set(True)
@@ -396,6 +399,8 @@ class MainWindow:
         """   -------------------------------------  Locals ---------------------------------------  """
 
         if self._settings.show_locals_table is True:
+
+
             self._view_menu.entryconfig('Show locals table', state='normal')
             # create a frame for the locals display
             self._frame_locals = UiFrame(self._top_frame, background=self._background_color, padx=5, pady=5)
@@ -1361,8 +1366,8 @@ class MainWindow:
                 self._load_calc_state(calc_state)
                 log(f"applied settings from file: {self._autosave_path}")
         except Exception as ex:
-            self._update_message_display(f"Error loading settings on launch: {ex}")
-            log(f"Error loading settings from file: {self._autosave_path}")
+            log(f"Error loading settings: {ex}, from file: {self._autosave_path}")
+
 
         try:
             for lib in self._settings.load_on_launch:
@@ -1856,162 +1861,7 @@ class MainWindow:
         remove_button.pack(padx=10, pady=5, side='right')
 
 
-    def str_to_numpy_array_simple(self, s: str, dtype = float, delimiter = None) -> np.ndarray:
-        """
-        Parse a string into a NumPy array.
 
-        Rules / behavior:
-        - If `delimiter` is provided, split fields by that delimiter (preserves empty fields).
-        - If `delimiter` is None, the function detects a delimiter in the first non-empty line:
-          prefers '\t', then ',', then ';'. If none are found, it uses whitespace rules.
-        - When using whitespace (no explicit delimiter found):
-          - If at least one non-empty line contains multiple whitespace-separated tokens,
-            the string is treated as a 2D table (each line -> a row, tokens split on whitespace).
-          - Otherwise the entire string is treated as a flat list of values (global whitespace split)
-            and a 1D array is returned (this is the change to support newline-separated values).
-        - Empty fields become np.nan (so numeric dtype can be preserved).
-        - Rows with different column counts are padded with np.nan to form a rectangular 2D array.
-        - Tries to cast to `dtype` (default float); if casting fails for some cells it will fallback to float
-          or to an object array.
-        """
-        if s is None:
-            return np.array([])
-
-        # Normalize input and lines
-        lines = s.splitlines()
-
-        # find first non-empty line for delimiter detection
-        first_non_empty = next((ln for ln in lines if ln.strip()), None)
-
-        chosen = delimiter
-        if chosen is None and first_non_empty is not None:
-            if '\t' in first_non_empty:
-                chosen = '\t'
-            elif ',' in first_non_empty:
-                chosen = ','
-            elif ';' in first_non_empty:
-                chosen = ';'
-            else:
-                chosen = None  # use whitespace rules below
-
-        # If we have an explicit delimiter (or detected tab/comma/semicolon), parse as a table
-        if chosen is not None:
-            parsed_rows = []
-            for ln in lines:
-                if ln.strip() == '':
-                    continue
-                tokens = [t.strip() for t in ln.split(chosen)]
-                row = []
-                for tok in tokens:
-                    if tok == '':
-                        row.append(np.nan)
-                    else:
-                        if dtype is not None:
-                            try:
-                                row.append(dtype(tok))
-                                continue
-                            except Exception:
-                                pass
-                        try:
-                            row.append(float(tok))
-                        except Exception:
-                            row.append(tok)
-                parsed_rows.append(row)
-
-            if not parsed_rows:
-                return np.array([])
-
-            max_cols = max(len(r) for r in parsed_rows)
-            for r in parsed_rows:
-                if len(r) < max_cols:
-                    r.extend([np.nan] * (max_cols - len(r)))
-
-            try:
-                arr = np.array(parsed_rows, dtype=dtype)
-            except Exception:
-                try:
-                    arr = np.array(parsed_rows, dtype=float)
-                except Exception:
-                    arr = np.array(parsed_rows, dtype=object)
-
-            # Flatten single-row or single-column to 1D
-            if arr.ndim == 2 and (arr.shape[0] == 1 or arr.shape[1] == 1):
-                return arr.flatten()
-            return arr
-
-        # No explicit delimiter -> whitespace rules:
-        # Decide whether to treat as 2D table (per-line rows) or as a single flat list.
-        # If any non-empty line has more than one whitespace-separated token, treat as 2D.
-        non_empty_lines = [ln for ln in lines if ln.strip() != '']
-        line_token_counts = [len(re.split(r'\s+', ln.strip())) for ln in non_empty_lines]
-        treat_as_2d = any(count > 1 for count in line_token_counts)
-
-        if not non_empty_lines:
-            return np.array([])
-
-        if treat_as_2d:
-            # parse per-line into rows (whitespace splits), keeping per-line structure
-            parsed_rows = []
-            for ln in non_empty_lines:
-                tokens = re.split(r'\s+', ln.strip())
-                row = []
-                for tok in tokens:
-                    if tok == '':
-                        row.append(np.nan)
-                    else:
-                        if dtype is not None:
-                            try:
-                                row.append(dtype(tok))
-                                continue
-                            except Exception:
-                                pass
-                        try:
-                            row.append(float(tok))
-                        except Exception:
-                            row.append(tok)
-                parsed_rows.append(row)
-
-            max_cols = max(len(r) for r in parsed_rows)
-            for r in parsed_rows:
-                if len(r) < max_cols:
-                    r.extend([np.nan] * (max_cols - len(r)))
-
-            try:
-                arr = np.array(parsed_rows, dtype=dtype)
-            except Exception:
-                try:
-                    arr = np.array(parsed_rows, dtype=float)
-                except Exception:
-                    arr = np.array(parsed_rows, dtype=object)
-
-            if arr.ndim == 2 and (arr.shape[0] == 1 or arr.shape[1] == 1):
-                return arr.flatten()
-            return arr
-
-        else:
-            # Treat the whole input as a flat list of tokens separated by any whitespace (this handles newline-separated values)
-            tokens = re.split(r'\s+', ' '.join(non_empty_lines).strip())
-            vals = []
-            for tok in tokens:
-                if tok == '':
-                    continue
-                if dtype is not None:
-                    try:
-                        vals.append(dtype(tok))
-                        continue
-                    except Exception:
-                        pass
-                try:
-                    vals.append(float(tok))
-                except Exception:
-                    vals.append(tok)
-            try:
-                return np.array(vals, dtype=dtype)
-            except Exception:
-                try:
-                    return np.array(vals, dtype=float)
-                except Exception:
-                    return np.array(vals, dtype=object)
 
     def _paste_wrapper_no_args(self):
         self.paste(self._root.clipboard_get())
@@ -2026,9 +1876,8 @@ class MainWindow:
                     if sym in value:
                         value = value.replace(sym, '')
 
-
                 if '\t' in value:  # tab delimited string, likely from a
-                    array = self.str_to_numpy_array_simple(value, delimiter='\t')
+                    array = self._c.str_to_numpy_array(value, delimiter='\t')
                     self._c.stack_put(array)
 
                 elif '\n' in value: # go ahead and split the string into lines
@@ -2240,35 +2089,42 @@ class MainWindow:
         file_extension = ".pycalc"
 
         if save_path is None:
+            # file = filedialog.asksaveasfile(mode='wb', defaultextension=file_extension, initialdir=self._autosave_path)
             file = filedialog.asksaveasfile(mode='wb', defaultextension=file_extension, initialdir=self._autosave_path)
+            save_path = file.name
             if file is None:
                 return
+        else:
+            try:
+                file = open(save_path, mode='wb')
+            except Exception as ex:
+                self._update_message_display(f"Error saving state to file: {ex}")
+                return
 
-            else:
-                calc_state = CalculatorUiState()
-                calc_state.stack = self._c.return_stack_for_display()
-                calc_state.locals = self._c.return_locals()
-                calc_state.functions = self._c.return_user_functions()
-                calc_state.settings = copy(self._settings)
+        calc_state = CalculatorUiState()
+        calc_state.stack = self._c.return_stack_for_display()
+        calc_state.locals = self._c.return_locals()
+        calc_state.functions = self._c.return_user_functions()
+        calc_state.settings = copy(self._settings)
 
 
 
-                calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
-                calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
-                calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
+        calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
+        calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
+        calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
 
-                if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
+        if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
 
-                    calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
-                    calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
+            calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
+            calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
 
-                #todo: need to figure out how to get the width to save it.
-                calc_state.settings.message_width = 30
+        #todo: need to figure out how to get the width to save it.
+        calc_state.settings.message_width = 30
 
-                pkl_dump = pickle.dumps(calc_state)
-                file.write(pkl_dump)
-                file.close()
-                log(f"saved state to file: {save_path}")
+        pkl_dump = pickle.dumps(calc_state)
+        file.write(pkl_dump)
+        file.close()
+        log(f"saved state to file: {save_path}")
 
     def menu_load_state(self):
         """ loads the settings and state from a file of the users choice """
@@ -2298,12 +2154,15 @@ class MainWindow:
         if calc_state.settings is not None:
             # need to handle new items were added to the settings class
             incoming = calc_state.settings
+            incoming_keys = set(vars(incoming).keys())
             latest = self._settings
-            dif = set(vars(incoming)) ^ set(vars(latest))
-            for key in dif:
-                setattr(incoming, key, getattr(latest, key))
 
-            self._settings = incoming
+            # the current settngs may have fields that do not exist in an older save settings, grab existing keys only
+            for key, value in vars(latest).items():
+                if key in incoming_keys:
+                    setattr(latest, key, getattr(incoming, key))
+
+            self._settings = latest
 
         try:
             if calc_state.functions is not None:
