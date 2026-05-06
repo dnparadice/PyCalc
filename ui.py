@@ -384,8 +384,11 @@ class MainWindow:
             if item.cget('label') == label:
                 return item
 
-    def _set_visibility_locals_table(self, state: bool, number_of_visible_rows=10):
-        """ sets the visibility of the locals table based on the state """
+    def _set_visibility_locals_table(self, state: bool, number_of_visible_rows=None):
+        """ sets the visibility of the locals table based on the state
+        :param state: bool, True to show the locals table, False to hide the locals table
+        :param number_of_visible_rows: None, if None uses settings else uses number passed
+        """
         if state is True:
             self._settings.show_locals_table = True
             self._tk_var_menu_view_show_locals_table.set(True)
@@ -396,6 +399,8 @@ class MainWindow:
         """   -------------------------------------  Locals ---------------------------------------  """
 
         if self._settings.show_locals_table is True:
+
+
             self._view_menu.entryconfig('Show locals table', state='normal')
             # create a frame for the locals display
             self._frame_locals = UiFrame(self._top_frame, background=self._background_color, padx=5, pady=5)
@@ -1361,8 +1366,8 @@ class MainWindow:
                 self._load_calc_state(calc_state)
                 log(f"applied settings from file: {self._autosave_path}")
         except Exception as ex:
-            self._update_message_display(f"Error loading settings on launch: {ex}")
-            log(f"Error loading settings from file: {self._autosave_path}")
+            log(f"Error loading settings: {ex}, from file: {self._autosave_path}")
+
 
         try:
             for lib in self._settings.load_on_launch:
@@ -2084,35 +2089,42 @@ class MainWindow:
         file_extension = ".pycalc"
 
         if save_path is None:
+            # file = filedialog.asksaveasfile(mode='wb', defaultextension=file_extension, initialdir=self._autosave_path)
             file = filedialog.asksaveasfile(mode='wb', defaultextension=file_extension, initialdir=self._autosave_path)
+            save_path = file.name
             if file is None:
                 return
+        else:
+            try:
+                file = open(save_path, mode='wb')
+            except Exception as ex:
+                self._update_message_display(f"Error saving state to file: {ex}")
+                return
 
-            else:
-                calc_state = CalculatorUiState()
-                calc_state.stack = self._c.return_stack_for_display()
-                calc_state.locals = self._c.return_locals()
-                calc_state.functions = self._c.return_user_functions()
-                calc_state.settings = copy(self._settings)
+        calc_state = CalculatorUiState()
+        calc_state.stack = self._c.return_stack_for_display()
+        calc_state.locals = self._c.return_locals()
+        calc_state.functions = self._c.return_user_functions()
+        calc_state.settings = copy(self._settings)
 
 
 
-                calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
-                calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
-                calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
+        calc_state.settings.stack_value_width = self._stack_table.column('value', 'width')
+        calc_state.settings.stack_index_width = self._stack_table.column('#0', 'width')
+        calc_state.settings.stack_type_width = self._stack_table.column('type', 'width')
 
-                if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
+        if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
 
-                    calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
-                    calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
+            calc_state.settings.locals_width_key = self._locals_table.column('#0', 'width')
+            calc_state.settings.locals_width_value = self._locals_table.column('value', 'width')
 
-                #todo: need to figure out how to get the width to save it.
-                calc_state.settings.message_width = 30
+        #todo: need to figure out how to get the width to save it.
+        calc_state.settings.message_width = 30
 
-                pkl_dump = pickle.dumps(calc_state)
-                file.write(pkl_dump)
-                file.close()
-                log(f"saved state to file: {save_path}")
+        pkl_dump = pickle.dumps(calc_state)
+        file.write(pkl_dump)
+        file.close()
+        log(f"saved state to file: {save_path}")
 
     def menu_load_state(self):
         """ loads the settings and state from a file of the users choice """
@@ -2142,12 +2154,15 @@ class MainWindow:
         if calc_state.settings is not None:
             # need to handle new items were added to the settings class
             incoming = calc_state.settings
+            incoming_keys = set(vars(incoming).keys())
             latest = self._settings
-            dif = set(vars(incoming)) ^ set(vars(latest))
-            for key in dif:
-                setattr(incoming, key, getattr(latest, key))
 
-            self._settings = incoming
+            # the current settngs may have fields that do not exist in an older save settings, grab existing keys only
+            for key, value in vars(latest).items():
+                if key in incoming_keys:
+                    setattr(latest, key, getattr(incoming, key))
+
+            self._settings = latest
 
         try:
             if calc_state.functions is not None:
