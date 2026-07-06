@@ -12,6 +12,11 @@ import numpy as np
 import struct
 import re
 
+import matplotlib
+matplotlib.use('Agg')  # ensure non-interactive backend safe inside Tk; FigureCanvasTkAgg will switch as needed
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 from calc import Calculator
 import engnum
 import plots
@@ -229,6 +234,8 @@ class MainWindow:
         self._plot_menu.add_command(label='Plot', command=self.popup_x_plot)
         self._plot_menu.add_command(label='XY Plot', command=self.popup_xy_plot)
         self._plot_menu.add_command(label='XYZ Plot', command=self.popup_xyz_plot)
+        self._plot_menu.add_separator()
+        self._plot_menu.add_command(label='Create Arrays', command=self.popup_create_array)
         self._plot_menu.add_separator()
         self._plot_menu.add_command(label='Edit plot options string', command=self.popup_edit_plot_options_string)
 
@@ -1806,6 +1813,233 @@ class MainWindow:
         """ opens a popup window to show the xyz plot options """
         pass
 
+    def popup_create_array(self):
+        """ popup to create X (linspace) and Y (function of X); shows table, find-Y, and a plot """
+
+        window = tk.Toplevel(self._root)
+        window.title('Create Array')
+        window.geometry('800x600')
+
+        # Top frame: X creation
+        top = ttk.Frame(window, padding=6)
+        top.pack(fill='x', padx=6, pady=6)
+
+        ttk.Label(top, text='X name:').grid(row=0, column=0, sticky='w')
+        x_name_e = ttk.Entry(top, width=12); x_name_e.insert(0, 'X'); x_name_e.grid(row=0, column=1, padx=4)
+
+        ttk.Label(top, text='Start:').grid(row=0, column=2, sticky='w')
+        start_e = ttk.Entry(top, width=10); start_e.insert(0, '0'); start_e.grid(row=0, column=3, padx=4)
+
+        ttk.Label(top, text='Stop:').grid(row=0, column=4, sticky='w')
+        stop_e = ttk.Entry(top, width=10); stop_e.insert(0, '100'); stop_e.grid(row=0, column=5, padx=4)
+
+        ttk.Label(top, text='Points:').grid(row=0, column=6, sticky='w')
+        points_e = ttk.Entry(top, width=8); points_e.insert(0, '1000'); points_e.grid(row=0, column=7, padx=4)
+
+
+
+        def create_x():
+            try:
+                start = float(start_e.get())
+                stop = float(stop_e.get())
+                pts = int(points_e.get())
+                if pts <= 0:
+                    raise ValueError('Points must be > 0')
+            except Exception as ex:
+                self._update_message_display(f"Invalid X parameters: {ex}")
+                return
+            X = np.linspace(start, stop, pts)
+            name = x_name_e.get().strip() or 'X'
+            # store to calculator locals by passing a python literal list (calculator user_entry expects expressions)
+            try:
+                self._c.user_entry(X)
+                self._c.enter_press()
+                self._c.user_entry(f"{name} =")
+                self._c.enter_press()
+
+            except Exception as ex:
+                self._update_message_display(f"Error creating X: {ex}")
+                return
+
+            self._update_locals_display()
+            self._update_message_display(f"Created {name} with {pts} points from {start} to {stop}")
+            nonlocal_XY['X'] = X
+            refresh_all()
+
+        ttk.Button(top, text='Create X', command=create_x).grid(row=0, column=8, padx=6)
+
+        # Middle frame: Y creation / function selection
+        mid = ttk.Frame(window, padding=6)
+        mid.pack(fill='x', padx=6, pady=6)
+
+        ttk.Label(mid, text='Available user functions:').grid(row=0, column=0, sticky='w')
+        user_funcs = list(self._c.return_user_functions().keys())
+        func_cb = ttk.Combobox(mid, values=user_funcs, width=30)
+        func_cb.grid(row=0, column=1, padx=4)
+
+        ttk.Label(mid, text='Y name:').grid(row=1, column=0, sticky='w')
+        y_name_e = ttk.Entry(mid, width=12); y_name_e.insert(0, 'Y'); y_name_e.grid(row=1, column=1, sticky='w', padx=4)
+
+        ttk.Label(mid, text='Expression (use `X`, `np`):').grid(row=2, column=0, sticky='w')
+        expr_e = ttk.Entry(mid, width=60)
+        expr_e.insert(0, 'np.sin(X)')
+        expr_e.grid(row=2, column=1, columnspan=3, sticky='w', padx=4, pady=2)
+
+        def on_func_select(evt=None):
+            fn = func_cb.get().strip()
+            if fn:
+                expr_e.delete(0, 'end')
+                expr_e.insert(0, f"{fn}(X)")
+
+        func_cb.bind('<<ComboboxSelected>>', on_func_select)
+
+        def create_y():
+            X = nonlocal_XY.get('X', None)
+            if X is None:
+                self._update_message_display("Create X first.")
+                return
+            expr = expr_e.get().strip()
+
+
+            if not expr:
+                self._update_message_display("Provide an expression for Y (uses X and np).")
+                return
+
+            # use the calculator's user_entry to evaluate the expression in the calculator's context
+            try:
+                self._c.user_entry(expr)
+                self._c.enter_press()
+                Y = self._c.clear_stack_level(0) # pop the result from the stack
+            except Exception as ex:
+                self._update_message_display(f"Error evaluating expression: {ex}")
+                return
+
+            yname = y_name_e.get().strip('(X)') or 'Y'
+            self._c.user_entry(Y)
+            self._c.enter_press()
+            self._c.user_entry(f"{yname} =")
+            self._c.enter_press()
+
+            self._update_locals_display()
+            self._update_message_display(f"Created {yname} ({Y.size} points)")
+            nonlocal_XY['Y'] = Y
+            refresh_all()
+
+        ttk.Button(mid, text='Create Y', command=create_y).grid(row=2, column=4, padx=6)
+
+        # Lower area: split into left (table & find) and right (plot)
+        lower = ttk.Frame(window, padding=6)
+        lower.pack(fill='both', expand=True, padx=6, pady=6)
+
+        left = ttk.Frame(lower)
+        left.pack(side='left', fill='both', expand=True)
+
+        right = ttk.Frame(lower)
+        right.pack(side='right', fill='both', expand=True)
+
+        # XY table (Treeview)
+        tree_frame = ttk.Frame(left)
+        tree_frame.pack(fill='both', expand=True)
+        cols = ('x', 'y')
+        tree = ttk.Treeview(tree_frame, columns=cols, show='headings', height=15)
+        tree.heading('x', text='X')
+        tree.heading('y', text='Y')
+        tree.column('x', width=120, anchor='e')
+        tree.column('y', width=120, anchor='e')
+        vsb = ttk.Scrollbar(tree_frame, orient='vertical', command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side='left', fill='both', expand=True)
+        vsb.pack(side='left', fill='y')
+
+        # Find Y controls
+        find_frame = ttk.Frame(left, padding=4)
+        find_frame.pack(fill='x')
+        ttk.Label(find_frame, text='Find Y for X =').pack(side='left')
+        find_e = ttk.Entry(find_frame, width=12);
+        find_e.pack(side='left', padx=4)
+
+        # result field (readonly)
+        result_e = ttk.Entry(find_frame, width=16, state='readonly')
+        result_e.pack(side='left', padx=6)
+
+        def _set_result(text: str):
+            # temporarily enable to update then set back to readonly
+            result_e.config(state='normal')
+            result_e.delete(0, 'end')
+            result_e.insert(0, str(text))
+            result_e.config(state='readonly')
+
+        def find_y():
+            try:
+                x_val = float(find_e.get())
+            except Exception:
+                _set_result('Invalid X')
+                return
+
+            X = nonlocal_XY.get('X', None)
+            Y = nonlocal_XY.get('Y', None)
+            if X is None or Y is None:
+                _set_result('No data')
+                return
+
+            # find closest index
+            try:
+                idx = (np.abs(X - x_val)).argmin()
+                y_val = Y[idx]
+                _set_result(y_val)
+            except Exception:
+                _set_result('Not found')
+
+        ttk.Button(find_frame, text='Find', command=find_y).pack(side='left', padx=4)
+
+        # Plot area using matplotlib
+        fig = Figure(figsize=(4, 3))
+        ax = fig.add_subplot(111)
+        canvas = FigureCanvasTkAgg(fig, master=right)
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.pack(fill='both', expand=True)
+
+        # state holder for arrays
+        nonlocal_XY = {'X': None, 'Y': None}
+
+        def refresh_table():
+            tree.delete(*tree.get_children())
+            X = nonlocal_XY.get('X', None)
+            Y = nonlocal_XY.get('Y', None)
+            if X is None:
+                return
+            # limit rows displayed for performance; allow scroll for full
+            size = X.size
+            max_display = 5000  # reasonable cap
+            display_count = min(size, max_display)
+            for i in range(display_count):
+                xv = X[i]
+                yv = Y[i] if (Y is not None and i < Y.size) else ''
+                tree.insert('', 'end', values=(f"{xv:.6g}", f"{yv:.6g}" if yv != '' else ''))
+            if size > max_display:
+                tree.insert('', 'end', values=(f"... ({size} total)", ''))
+
+        def refresh_plot():
+            ax.clear()
+            X = nonlocal_XY.get('X', None)
+            Y = nonlocal_XY.get('Y', None)
+            if X is None or Y is None:
+                ax.set_title('No data')
+            else:
+                ax.plot(X, Y, '-', lw=1)
+                ax.set_xlabel(x_name_e.get().strip() or 'X')
+                ax.set_ylabel(y_name_e.get().strip() or 'Y')
+                ax.grid(True)
+            canvas.draw_idle()
+
+        def refresh_all():
+            refresh_table()
+            refresh_plot()
+
+        # initial draw
+        refresh_all()
+
+
     def popup_load_python_module(self):
         """ opens a popup window to load a python module into the calculator """
         window = tk.Toplevel(self._root)
@@ -1859,9 +2093,6 @@ class MainWindow:
         add_button.pack(padx=10, pady=5, side='left')
         remove_button = ttk.Button(window, text='Remove Selected Module', command=remove_module)
         remove_button.pack(padx=10, pady=5, side='right')
-
-
-
 
     def _paste_wrapper_no_args(self):
         self.paste(self._root.clipboard_get())
@@ -1923,7 +2154,6 @@ class MainWindow:
 
 
         self._update_message_display(msg)
-
 
     def popup_edit_numeric_display_format(self):
         """ opens a popup window to edit the format of displayed numerics """
