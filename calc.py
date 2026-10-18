@@ -1,10 +1,9 @@
 import re
 import types
 import sys
+import importlib
 import numpy as np
 import math as math
-import matplotlib
-import matplotlib.pyplot as plt
 from copy import copy
 import inspect
 import builtins
@@ -46,7 +45,15 @@ print(r"""
 # log the python imported lib versions
 log(f"Python version: {sys.version}")
 log(f"numpy version: {np.__version__}")
-log(f"matplotlib version: {matplotlib.__version__}")
+
+class _LazyPyplot(types.ModuleType):
+    """Keep plt available to calculator expressions without loading plots at startup."""
+
+    def __getattr__(self, name):
+        return getattr(importlib.import_module('matplotlib.pyplot'), name)
+
+
+plt = _LazyPyplot('matplotlib.pyplot')
 
 
 
@@ -217,15 +224,14 @@ class Calculator:
         self._exec_globals.update(py_builtins)
         # self._exec_globals.update(py_operators)
 
-        # finally, load up numpy, and matplotlib because they are distributed with python and supercharge the calculator
+        # Load math and NumPy now; defer Matplotlib until a plotting attribute is used.
         self.user_entry('import math as math')
         self.user_entry('enter')
 
         self.user_entry('import numpy as np')  # you can import any installed library into the calculator like this
         self.user_entry('enter')
 
-        self.user_entry('import matplotlib.pyplot as plt')
-        self.user_entry('enter')
+        self._exec_globals['plt'] = plt
 
     def undo_last_action(self, pop_last_history=False):
         """ undoes the last action by restoring the stack to the previous state

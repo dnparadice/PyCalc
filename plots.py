@@ -1,6 +1,10 @@
-import matplotlib.pyplot as plt
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 import numpy as np
 
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 class PlotContainer:
     def __init__(self, data: list | np.ndarray,
                     name="Plot",
@@ -28,7 +32,7 @@ class PlotContainer:
         self.ylabel = ylabel
         self.data = self.y_data
 
-    def display_plot(self, axis: plt.Axes, name):
+    def display_plot(self, axis: Axes, name):
         Y = self.y_data
         X = np.arange(len(Y))
         axis.plot(X, Y,
@@ -59,7 +63,7 @@ class XyPlotContainer(PlotContainer):
         super().__init__(y_data, name, color, line_style, marker, linewidth, markersize, alpha, grid, xlabel, ylabel)
         self.x_data = np.array(x_data)
 
-    def display_plot(self, axis: plt.Axes, name):
+    def display_plot(self, axis: Axes, name):
         axis.plot(self.x_data, self.y_data,
                  color=self.color,
                  linestyle=self.line_style,
@@ -68,5 +72,4 @@ class XyPlotContainer(PlotContainer):
                  markersize=self.markersize,
                  alpha=self.alpha,
                  label=name)
-
 

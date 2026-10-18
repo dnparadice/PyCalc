@@ -1,6 +1,7 @@
 import ast
 import inspect
 import subprocess
+import sys
 import tkinter as tk
 from locale import currency
 from tkinter import font as tkfont
@@ -11,11 +12,6 @@ from tkinter.ttk import Style
 import numpy as np
 import struct
 import re
-
-import matplotlib
-matplotlib.use('Agg')  # ensure non-interactive backend safe inside Tk; FigureCanvasTkAgg will switch as needed
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from calc import Calculator
 import engnum
@@ -123,26 +119,36 @@ class CalculatorUiState:
 
 class MainWindow:
 
-    def __init__(self, settings: CalculatorUiSettings = None):
+    def __init__(self, settings: CalculatorUiSettings = None, root=None):
         """ creates the main window for the calculator
         @param settings: CalculatorUiSettings, the settings for the calculator UI, passing a value besides None here
         overrides the 'load settings on launch' behavior and uses the passed settings """
 
         # check the OS type, tkinter has different behavior on different OS's
-        sys = platform_system()
-        if sys == 'Linux':
+        os_name = platform_system()
+        if os_name == 'Linux':
             self._os_type = OsType.LINUX
-        elif sys == 'Darwin':
+        elif os_name == 'Darwin':
             self._os_type = OsType.MAC
-        elif sys == 'Windows':
+        elif os_name == 'Windows':
             self._os_type = OsType.WINDOWS
         else: # includes null, '', and Java
             self._os_type = OsType.OTHER
 
         self._autosave_path = 'last_state_autosave.pycalc'
         self._c = Calculator()
-        self._root = tk.Tk()
+        self._root = root if root is not None else tk.Tk()
         self._root.title("PyCalc")
+        # PyInstaller places bundled data under _MEIPASS; source runs use media/.
+        if getattr(sys, 'frozen', False):
+            icon_path = pathlib.Path(sys._MEIPASS) / 'resources' / 'pycalc_icon_a.png'
+        else:
+            icon_path = pathlib.Path(__file__).resolve().parent / 'media' / 'pycalc_icon_a.png'
+        try:
+            self._icon_image = tk.PhotoImage(master=self._root, file=str(icon_path))
+            self._root.iconphoto(True, self._icon_image)
+        except (tk.TclError, OSError) as exc:
+            log(f'Unable to load application icon {icon_path}: {exc}')
         self._settings = CalculatorUiSettings()  # for linting just instantiate this here overwrite if necessary
 
         # handle the settings
@@ -180,7 +186,7 @@ class MainWindow:
 
         # FILE MENU ........................
 
-        self._file_menu.add_command(label='Quit', command=self._root.quit)
+        self._file_menu.add_command(label='Quit', command=self.user_exit)
         self._file_menu.add_command(label='Load state', command=self.menu_load_state)
         self._file_menu.add_command(label='Save state', command=self.menu_save_state)
         self._file_menu.add_checkbutton(label='Save state on exit', onvalue=True, offvalue=False)
@@ -1386,18 +1392,14 @@ class MainWindow:
 
     def user_exit(self):
         """ exits the program, saves the state if the settings are set to save state on exit """
-        if self._settings.save_state_on_exit:
-            pth = pathlib.Path(self._autosave_path)
-            if not pth.exists():
-                # create the file
-                # get currnet directory
-                my_dir = pathlib.Path.cwd()
-                pth = my_dir / 'last_state_autosave.pycalc'
-                pth.touch(exist_ok=True)
-                self._autosave_path = str(pth)
-            self.menu_save_state(save_path=self._autosave_path)
-            log(f"clean exit")
-        self._root.quit()
+        try:
+            if self._settings.save_state_on_exit:
+                self.menu_save_state(save_path=self._autosave_path)
+        except Exception as exc:
+            log(f"Unable to save state on exit: {exc}")
+        finally:
+            self._root.destroy()
+            self._root.quit()
 
     def _get_stack_value_info(self):
         """ bound to the right click menu to get info on the selected stack item
@@ -1993,6 +1995,9 @@ class MainWindow:
         ttk.Button(find_frame, text='Find', command=find_y).pack(side='left', padx=4)
 
         # Plot area using matplotlib
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
         fig = Figure(figsize=(4, 3))
         ax = fig.add_subplot(111)
         canvas = FigureCanvasTkAgg(fig, master=right)
@@ -2586,6 +2591,3 @@ class MainWindow:
                 except Exception as ex:
                     message = f"Error opening idle: {ex}"
                     raise Exception(message)
-
-
-
