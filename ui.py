@@ -97,10 +97,14 @@ class CalculatorUiSettings:
 
         self.background_color = 'default'  # set to 'default' or <color>, default matches the system theme
 
+        # fonts are (family, size). The stack, locals and message fonts are kept equal and drive the data font,
+        # button_font drives the buttons and table headings, and ui_font drives everything else (menus, labels,
+        # entry fields, lists and popups). For ui_font the family 'Default' and the size None keep the system font.
         self.stack_font = ('Default', 15)
         self.locals_font = ('Default', 15)
         self.message_font = ('Default', 15)
         self.button_font = ('Default', 12)
+        self.ui_font = ('Default', None)
 
         self.ui_visible_state = UiVisibleState.STANDARD
         self.show_message_field = True
@@ -156,6 +160,9 @@ class MainWindow:
             self._load_settings_on_launch()
         else:
             self._settings = settings
+
+        # create the named fonts and apply the font settings, before any widget or menu is created
+        self._init_fonts()
 
         # handle the UI colors
         if self._settings.background_color == 'default':
@@ -364,18 +371,7 @@ class MainWindow:
         # add right click menu to stack
         self._stack_table.bind(btn, self._right_click_menu_stack_table)
 
-        # ------ Configure the Style of ALL TreeView objects here -------
-
-        # Configure the Treeview style (this will affect all Treeview objects)
-        stack_style = ttk.Style()
-        fnt = self._settings.stack_font[0]  # self._settings.stack_font like: ('Courier New', 19)
-        f_size = self._settings.stack_font[1]
-        f_style = 'normal'  # like: 'bold', 'italic', 'normal'
-        stack_style.configure("Treeview", font=(fnt, f_size, f_style))
-        stack_style.configure("Treeview.Heading", font=('System', 12, f_style))
-
-        # set cell height based on font size
-        stack_style.configure("Treeview", rowheight=f_size + 8)  # add some padding to the font size for row height
+        # note: the style of ALL Treeview objects (font and row height) is set in _apply_fonts()
 
         # re-size window to fit all visible elements
         self.re_draw_main_window_to_fit_all_elements()
@@ -386,6 +382,119 @@ class MainWindow:
         """ re-draws the main window to fit all visible elements """
         self._root.update_idletasks()
         self._root.geometry('')  # set to empty string to auto-size to fit all elements
+
+    # -------------------------------------  Fonts ---------------------------------------
+
+    # Tk's own named fonts. Every widget that is not given a font uses one of these, so configuring them restyles
+    # the menus, labels, entry fields, lists and popups, including the ones already on screen.
+    _SYSTEM_FONT_NAMES = ('TkDefaultFont', 'TkTextFont', 'TkMenuFont', 'TkHeadingFont', 'TkFixedFont',
+                          'TkCaptionFont', 'TkSmallCaptionFont', 'TkIconFont', 'TkTooltipFont')
+
+    def _init_fonts(self):
+        """ creates the named fonts used by the UI and applies the font settings to them. Call once, before any
+        widget is created.
+
+        All fonts in the UI come from named fonts so that a font change is one call to _apply_fonts() and reaches
+        every widget without re-building it:
+            PyCalcDataFont   -- the stack, locals and array tables and the message field (settings.stack_font)
+            PyCalcButtonFont -- the buttons and the table headings (settings.button_font)
+            Tk's named fonts -- everything else (settings.ui_font)
+        """
+        existing = tkfont.names(self._root)
+
+        # remember the system fonts before they are touched, 'Default' in the settings restores these
+        self._system_fonts = dict()
+        for name in self._SYSTEM_FONT_NAMES:
+            if name in existing:
+                actual = tkfont.nametofont(name, root=self._root).actual()
+                self._system_fonts.update({name: (actual['family'], actual['size'])})
+        self._system_ui_linespace = self._ui_linespace()
+
+        self._data_font = self._get_named_font('PyCalcDataFont')
+        self._button_font = self._get_named_font('PyCalcButtonFont')
+
+        # a menu holds a copy of the system menu font unless it is told to use the named font
+        self._root.option_add('*Menu.font', 'TkMenuFont')
+
+        self._apply_fonts()
+
+    def _get_named_font(self, name: str) -> tkfont.Font:
+        """ returns the named font, creates it if it does not exist yet """
+        if name in tkfont.names(self._root):
+            return tkfont.nametofont(name, root=self._root)
+        return tkfont.Font(root=self._root, name=name, exists=False)
+
+    def _ui_linespace(self) -> int:
+        """ returns the line height in pixels of the font used by the labels and entry fields """
+        try:
+            return tkfont.nametofont('TkDefaultFont', root=self._root).metrics('linespace')
+        except tk.TclError:
+            return 1
+
+    def _system_ui_font_size(self) -> int:
+        """ returns the size of the system font used by the labels and entry fields """
+        return self._system_fonts.get('TkDefaultFont', ('', 10))[1]
+
+    @staticmethod
+    def _font_setting(setting, default_size):
+        """ returns (family, size) from a font setting like ('Courier New', 19), tolerant of a malformed setting """
+        try:
+            family = str(setting[0])
+            size = setting[1]
+            size = default_size if size is None else int(size)
+        except (TypeError, IndexError, ValueError):
+            family, size = 'Default', default_size
+        return family, size
+
+    def _apply_fonts(self):
+        """ applies the font settings to the named fonts, this updates every font in the UI in place """
+        family, size = self._font_setting(self._settings.stack_font, 15)
+        self._data_font.configure(family=family, size=size, weight='normal', slant='roman')
+
+        family, size = self._font_setting(self._settings.button_font, 12)
+        self._button_font.configure(family=family, size=size, weight='normal', slant='roman')
+
+        # older settings objects do not have ui_font
+        ui_family, ui_size = self._font_setting(getattr(self._settings, 'ui_font', None), None)
+        for name, (system_family, system_size) in self._system_fonts.items():
+            # the fixed font is used for python code, it keeps its monospaced family and follows the size only
+            keep_family = ui_family == 'Default' or name == 'TkFixedFont'
+            tkfont.nametofont(name, root=self._root).configure(
+                family=system_family if keep_family else ui_family,
+                size=system_size if ui_size is None else ui_size)
+
+        # these styles affect ALL Treeview and ALL ttk Button objects
+        style = ttk.Style(self._root)
+        style.configure('Treeview', font=self._data_font)
+        style.configure('Treeview', rowheight=self._data_font.metrics('linespace'))  # row height from the real font
+        style.configure('Treeview.Heading', font=self._button_font)
+        style.configure('TButton', font=self._button_font)
+
+        # a table stretches its columns when the window grows and does not give the width back, return the columns
+        # to their set widths so the window can shrink again when the font gets smaller
+        self._reset_table_column_widths()
+
+        # re-size window to fit all visible elements
+        self.re_draw_main_window_to_fit_all_elements()
+
+    def _reset_table_column_widths(self):
+        """ sets the columns of the stack and locals tables to the widths in the settings """
+        try:
+            if hasattr(self, '_stack_table') and self._stack_table.winfo_exists():
+                self._stack_table.column('#0', width=self._settings.stack_index_width)
+                self._stack_table.column('value', width=self._settings.stack_value_width)
+                self._stack_table.column('type', width=self._settings.stack_type_width)
+            if hasattr(self, '_locals_table') and self._locals_table.winfo_exists():
+                self._locals_table.column('#0', width=self._settings.locals_width_key)
+                self._locals_table.column('value', width=self._settings.locals_width_value)
+        except tk.TclError as ex:
+            log(f"Error setting table column widths: {ex}")
+
+    def _scaled_geometry(self, width: int, height: int) -> str:
+        """ returns a geometry string like '400x300' for a popup whose size was laid out for the system font, grown
+        in proportion when the UI font is larger so the content still fits """
+        scale = max(1.0, self._ui_linespace() / max(1, self._system_ui_linespace))
+        return f'{int(width * scale)}x{int(height * scale)}'
 
 
     @ staticmethod
@@ -675,11 +784,7 @@ class MainWindow:
         else:
             pass # do this at the end of the method too to destroy the buttons
 
-        # set font
-        fnt = self._settings.button_font[0]
-        f_size = self._settings.button_font[1]
-        f_style = 'normal'  # like: 'bold', 'italic', 'normal
-        ttk.Style().configure("TButton", font=(fnt, f_size, f_style))
+        # note: the font of ALL ttk buttons is set in _apply_fonts()
 
         # Numeric buttons --------------------------------
 
@@ -774,12 +879,6 @@ class MainWindow:
             self._special_buttons = UiFrame(self._left_frame, background=self._background_color, padx=5, pady=5)
             # place to the right of the numeric buttons
 
-            # set font for all buttons in special buttons frame
-            fnt = self._settings.button_font[0]
-            f_size = self._settings.button_font[1]
-            f_style = 'normal'  # like: 'bold', 'italic', 'normal
-            set_font = (fnt, f_size, f_style)
-
             # create a button for 'stack to list'
             ttk.Button(self._special_buttons,
                        text='stack to list',
@@ -846,11 +945,8 @@ class MainWindow:
             self._message_field = tk.Text(self._top_frame,
                                           state='normal',
                                           height=self._settings.message_height,)
-            # set the font with settings
-            fnt = self._settings.message_font[0]
-            f_size = self._settings.message_font[1]
-            f_style = 'normal'  # like: 'bold', 'italic', 'normal'
-            self._message_field.config(font=(fnt, f_size, f_style))
+            # use the data font, it follows the font settings, see _apply_fonts()
+            self._message_field.config(font=self._data_font)
 
             # set width with settings
             self._message_field.config(width=self._settings.message_width)
@@ -1192,67 +1288,81 @@ class MainWindow:
         # create a button to cancel the changes
         ttk.Button(window, text='Close', command=window.destroy).pack(padx=10)
 
-    # add popup to set the font name and size for the stack and variable tables
+    # add popup to set the font name and sizes for the whole UI
     def popup_set_stack_font_parameters(self):
-        """ open a popup in which you can set the UiSettings variables for the stack font name and size in the UI """
+        """ open a popup in which you can set the UiSettings variables for the font name and the font sizes. One font
+        name applies to the whole UI, the sizes are set separately for the data, the buttons and everything else """
         window = tk.Toplevel(self._root)
-        window.title('Set Stack Font Parameters')
-        window.geometry('320x120')
-        window.resizable(False, False)
+        window.title('Set Font Parameters')
+        window.resizable(False, False)  # no fixed size, the window fits its content at any font size
 
         frm = ttk.Frame(window, padding=8)
         frm.pack(expand=True, fill='both')
 
-        ttk.Label(frm, text='Font Name:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
-        font_name_entry = ttk.Entry(frm, width=20)
+        # the installed font families, names starting with '@' are the vertical variants on Windows
+        families = sorted({name for name in tkfont.families(self._root) if not name.startswith('@')},
+                          key=str.lower)
+        family_lookup = {name.lower(): name for name in families}
+        family_lookup.update({'default': 'Default'})
+
+        ui_family, ui_size = self._font_setting(getattr(self._settings, 'ui_font', None), None)
+        if ui_size is None:
+            ui_size = self._system_ui_font_size()
+
+        ttk.Label(frm, text='Font name:').grid(row=0, column=0, sticky='w', padx=4, pady=4)
+        font_name_entry = ttk.Combobox(frm, width=28, values=['Default'] + families)
         font_name_entry.insert(0, str(self._settings.stack_font[0]))
         font_name_entry.grid(row=0, column=1, sticky='w', padx=4, pady=4)
 
-        ttk.Label(frm, text='Font Size:').grid(row=1, column=0, sticky='w', padx=4, pady=4)
-        font_size_entry = ttk.Entry(frm, width=8)
-        font_size_entry.insert(0, str(self._settings.stack_font[1]))
-        font_size_entry.grid(row=1, column=1, sticky='w', padx=4, pady=4)
+        size_rows = [('Stack, variables and message size:', self._font_setting(self._settings.stack_font, 15)[1]),
+                     ('Buttons and table headings size:', self._font_setting(self._settings.button_font, 12)[1]),
+                     ('Menus and popups size:', ui_size), ]
+        size_entries = []
+        for row, (label, value) in enumerate(size_rows, start=1):
+            ttk.Label(frm, text=label).grid(row=row, column=0, sticky='w', padx=4, pady=4)
+            entry = ttk.Entry(frm, width=8)
+            entry.insert(0, str(value))
+            entry.grid(row=row, column=1, sticky='w', padx=4, pady=4)
+            size_entries.append(entry)
 
         def apply_values():
-            new_font_name = font_name_entry.get()
+            entered_name = font_name_entry.get().strip()
+            new_font_name = family_lookup.get(entered_name.lower())
+            if new_font_name is None:
+                self._update_message_display(f"Font not found: '{entered_name}', pick a name from the list")
+                return
             try:
-                new_font_size = int(font_size_entry.get())
-                if new_font_size < 1:
+                new_sizes = [int(entry.get()) for entry in size_entries]
+                if min(new_sizes) < 1:
                     raise ValueError('Font size must be >= 1')
             except Exception as ex:
                 self._update_message_display(f"Invalid font size: {ex}")
                 return
+            data_size, button_size, new_ui_size = new_sizes
+
+            # the system font and size are stored as 'Default' and None so a saved state follows the system it is
+            # opened on
+            if new_font_name == 'Default' and new_ui_size == self._system_ui_font_size():
+                new_ui_size = None
 
             # apply to settings
-            self._settings.stack_font = (new_font_name, new_font_size)
-            self._settings.message_font = (new_font_name, new_font_size)
-            self._settings.locals_font = (new_font_name, new_font_size)
-            self._settings.button_font = (new_font_name, 12)
+            self._settings.stack_font = (new_font_name, data_size)
+            self._settings.message_font = (new_font_name, data_size)
+            self._settings.locals_font = (new_font_name, data_size)
+            self._settings.button_font = (new_font_name, button_size)
+            self._settings.ui_font = (new_font_name, new_ui_size)
 
-            # update stack table font
-            self._update_visible_ui_object_stack(self._settings.stack_rows)
-            self._update_stack_display()
+            # the widgets all use named fonts, so this updates every font on screen without re-building anything
+            self._apply_fonts()
 
-            # update the fonts for each section if visible
-            if self._settings.show_message_field is True:
-                self._set_visibility_message_field(False) # toggle visibility to update font on screen
-                self._set_visibility_message_field(True)
-
-            if self._settings.show_locals_table is True:
-                self._set_visibility_locals_table(False)
-                self._set_visibility_locals_table(True)
-
-            if self._settings.show_buttons is True:
-                self._set_visibility_buttons(False)
-                self._set_visibility_buttons(True)
-
-            self._update_message_display(f"Applied new stack font: {new_font_name} size {new_font_size}")
+            self._update_message_display(f"Applied new font: {new_font_name}, sizes: data {data_size}, "
+                                         f"buttons {button_size}, menus and popups {size_entries[2].get()}")
 
             window.destroy()
 
         # Buttons
         btn_frame = ttk.Frame(frm)
-        btn_frame.grid(row=3, column=0, columnspan=2, pady=10)
+        btn_frame.grid(row=len(size_rows) + 1, column=0, columnspan=2, pady=10)
         ttk.Button(btn_frame, text='OK', command=apply_values).pack(side='left', padx=6)
         ttk.Button(btn_frame, text='Cancel', command=window.destroy).pack(side='left', padx=6)
         # Enter key = apply
@@ -1265,8 +1375,7 @@ class MainWindow:
         variables height in the UI """
         window = tk.Toplevel(self._root)
         window.title('Set Stack / Message / Locals Heights')
-        window.geometry('320x180')
-        window.resizable(False, False)
+        window.resizable(False, False)  # no fixed size, the window fits its content at any font size
 
         frm = ttk.Frame(window, padding=8)
         frm.pack(expand=True, fill='both')
@@ -1529,7 +1638,7 @@ class MainWindow:
         window = tk.Toplevel(self._root)
         window.title('Y Plot Options')
         # make window dimensions 800 by 600
-        window.geometry('400x400')
+        window.geometry(self._scaled_geometry(400, 400))
 
         # crete grid manager for the popup2
         window.grid_rowconfigure(0, weight=1)
@@ -1618,7 +1727,7 @@ class MainWindow:
             window = tk.Toplevel(self._root)
             window.title('XY Plot Options')
             # make window dimensions 800 by 600
-            window.geometry('400x500')
+            window.geometry(self._scaled_geometry(400, 500))
 
             # grab all the locals that are lists or arrays
             plots_dict = dict()
@@ -1820,7 +1929,7 @@ class MainWindow:
 
         window = tk.Toplevel(self._root)
         window.title('Create Array')
-        window.geometry('800x600')
+        window.geometry(self._scaled_geometry(800, 600))
 
         # Top frame: X creation
         top = ttk.Frame(window, padding=6)
@@ -2049,7 +2158,7 @@ class MainWindow:
         """ opens a popup window to load a python module into the calculator """
         window = tk.Toplevel(self._root)
         window.title('Load Python Module')
-        window.geometry('550x300')
+        window.geometry(self._scaled_geometry(550, 300))
 
         modules = self._settings.load_on_launch
 
@@ -2372,6 +2481,7 @@ class MainWindow:
             file.close()
             calc_state = pickle.loads(bytes)    # type: CalculatorUiState
             self._load_calc_state(calc_state)
+            self._apply_fonts()  # the loaded state carries its own font settings
             self._update_locals_display()
             self._update_stack_display()
             self._update_message_display()
