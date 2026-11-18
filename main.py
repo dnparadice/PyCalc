@@ -1,9 +1,12 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+import hidpi
+
 
 if __name__ == '__main__':
     """ main entry point for the application """
+    hidpi.enable()  # must run before the first window is created
     root = tk.Tk()
     root.withdraw()
     splash = tk.Toplevel(root)
