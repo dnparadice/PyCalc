@@ -350,6 +350,7 @@ Use the **View** menu to control the visibility and appearance of the calculator
 - **Standard View** -- shows all buttons, the message field, the variable viewer and the stack.
 - **Mini View** -- shows only the stack view and sets the number of stack rows to 2.
 - **Set Number of Stack Rows** -- opens a dialog to set the number of stack, variable and message rows to show in the UI.
+- **Stack columns** -- selects the columns shown in the stack view. The stack values are always shown; Index, Type and Operation can each be shown or hidden. Operation is the operation that made the value, like `3 + 4` or `sin(0.5)`, `entry` for a number that was typed, or the name of the variable it was recalled from. The selection, the column widths and the operations are saved with the state.
 - **Set Font parameters** -- opens a dialog to set the font for the whole UI. One font family, picked from the installed fonts, applies everywhere, with three sizes: the stack, variable viewer and message field; the buttons and table headings; and the menus and popups. Python code in the function editor keeps a monospaced font and follows the size only. Window title bars and the file dialogs are drawn by the operating system and do not change.
 - **Edit numeric display format** -- opens a dialog to set the numeric display format (see above section on User Options)
 

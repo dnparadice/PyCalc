@@ -90,9 +90,11 @@ class CalculatorUiSettings:
         self.locals_width_key = 100
         self.locals_width_value = 160
 
-        self.stack_index_width = 20
-        self.stack_value_width = 200
-        self.stack_type_width = 50
+        # the columns of the stack table, by the key of the column, see MainWindow._define_stack_columns().
+        # stack_columns_visible lists the columns that are shown, stack_column_widths holds the width of each column
+        # in design pixels. A column that is not in stack_column_widths uses the default width of its definition.
+        self.stack_columns_visible = ['index', 'type', 'value']
+        self.stack_column_widths = {'index': 50, 'type': 60, 'value': 200}
         self.message_width = 30
         self.message_height = 5
 
@@ -117,9 +119,32 @@ class CalculatorUiSettings:
 class CalculatorUiState:
     def __init__(self):
         self.stack = []
+        self.stack_meta = []  # what the UI knows about each stack value, same order as stack, see _sync_stack_meta()
         self.locals = dict()
         self.settings = CalculatorUiSettings()
         self.functions = dict()
+
+
+class StackColumn:
+    """ describes one column of the stack table. The columns are defined in MainWindow._define_stack_columns(), the
+    table, the View menu, the settings and the saved state are all built from that one list. """
+
+    def __init__(self, key: str, heading: str, width: int, anchor: str, get_text, always_visible: bool = False):
+        """
+        :param key: the name of the column in the settings and in the table, never shown to the user
+        :param heading: the text at the top of the column, also the text of its entry in the View menu
+        :param width: the default width in design pixels
+        :param anchor: where the text sits in the column: 'w' left, 'e' right, 'center'
+        :param get_text: a method (index, value, meta) that returns the text of one cell. index is the stack level,
+            value is the stack value and meta is the dict of what the UI knows about that value
+        :param always_visible: True for a column the user can not hide
+        """
+        self.key = key
+        self.heading = heading
+        self.width = width
+        self.anchor = anchor
+        self.get_text = get_text
+        self.always_visible = always_visible
 
 
 class MainWindow:
@@ -165,6 +190,18 @@ class MainWindow:
         except (tk.TclError, OSError) as exc:
             log(f'Unable to load application icon {icon_path}: {exc}')
         self._settings = CalculatorUiSettings()  # for linting just instantiate this here overwrite if necessary
+
+        # the columns of the stack table and what the UI knows about each value on the stack. The calculator holds
+        # the stack as bare values, everything else about a value (like the operation that made it) lives here in
+        # the UI, in a list that is kept in step with the stack by _sync_stack_meta()
+        self._stack_columns = self._define_stack_columns()
+        self._stack_values = []  # the stack values as of the last sync, the same objects the calculator holds
+        self._stack_meta = []  # one dict per value in self._stack_values, same order, index 0 is X
+        self._stack_meta_memory = dict()  # id(value): (value, meta) of values seen before, an undo brings them back
+        self._stack_meta_restore = None  # the meta of a loaded state, waiting for the first sync after the load
+        self._stack_operation_hint = None  # set by a UI action to name the operation of the values it adds
+        self._last_input = None  # the last key or button press, names a value no other rule can name
+        self._last_message_seen = None  # the calculator message as of the last sync, to tell a new one from an old
 
         # handle the settings
         if settings is None:
@@ -257,6 +294,21 @@ class MainWindow:
         self._view_menu.add_separator()
         self._view_menu.add_command(label='Set number of visible rows', command=self.popup_set_stack_message_vars_height)
         self._view_menu.add_command(label='Set font parameters', command=self.popup_set_stack_font_parameters)
+
+        # one entry per column of the stack table that can be hidden, built from the column definitions
+        self._stack_columns_menu = tk.Menu(self._view_menu, tearoff=0)
+        self._view_menu.add_cascade(label='Stack columns', menu=self._stack_columns_menu)
+        self._tk_var_stack_columns = dict()  # key of the column: tk.BooleanVar, True when the column is shown
+        for column in self._stack_columns:
+            if column.always_visible:
+                continue
+            var = tk.BooleanVar(value=column.key in self._settings.stack_columns_visible)
+            self._tk_var_stack_columns.update({column.key: var})
+            self._stack_columns_menu.add_checkbutton(label=column.heading,
+                                                     onvalue=True,
+                                                     offvalue=False,
+                                                     variable=var,
+                                                     command=self._menu_view_stack_columns, )
         self._view_menu.add_separator()
         self._view_menu.add_command(label='Edit numeric display format', command=self.popup_edit_numeric_display_format)
 
@@ -359,12 +411,14 @@ class MainWindow:
             self._frame_stack = UiFrame(self._top_frame, background=self._background_color)
             self._frame_stack.grid(row=self._ROW_STACK, column=0, sticky='nsew')
 
-            # add a table with (n) rows and 4 columns named 'index', 'value', 'hex', 'bin' to display the stack
-            # self._stack_table = ttk.Treeview(self._frame_stack, columns=('value', 'type', ))
-            self._stack_table = ttk.Treeview(self._frame_stack, columns=('type', 'value', ))
-            self._stack_table.heading('#0', text='Index')
-            self._stack_table.heading('type', text='Type')
-            self._stack_table.heading('value', text='Stack Values')
+            # add a table to display the stack. It holds every column of self._stack_columns, which of them are
+            # shown is set in _apply_stack_columns(). The index of a row is also the text of its item, the methods
+            # that act on the selected row read it from there, so they work when the Index column is hidden.
+            self._stack_table = ttk.Treeview(self._frame_stack, show='headings',
+                                             columns=[column.key for column in self._stack_columns])
+            for column in self._stack_columns:
+                self._stack_table.heading(column.key, text=column.heading)
+                self._stack_table.column(column.key, anchor=column.anchor)
             self._stack_table.pack(fill='both', expand=True)
 
             # add right click menu to stack
@@ -374,9 +428,8 @@ class MainWindow:
         if number_visible_rows is not None:
             self._settings.stack_rows = number_visible_rows
         self._stack_table['height'] = self._settings.stack_rows
-        self._stack_table.column('#0', width=self._px(self._settings.stack_index_width), anchor='w',)
-        self._stack_table.column('value', width=self._px(self._settings.stack_value_width), anchor='e')
-        self._stack_table.column('type', width=self._px(self._settings.stack_type_width), anchor=tk.CENTER)
+        self._reset_table_column_widths()
+        self._apply_stack_columns()
 
         # note: the style of ALL Treeview objects (font and row height) is set in _apply_fonts()
 
@@ -450,13 +503,64 @@ class MainWindow:
                 # buttons of the popups. The calculator keys keep the tight fit, their size comes from the grid.
                 style.configure('TButton', padding=(self._px(6), self._px(1)))
                 style.configure('Key.TButton', padding=1)
+            self._shade_table_headings(style)
         except tk.TclError as ex:
             log(f"Error selecting the widget theme: {ex}")
+
+    def _shade_table_headings(self, style: ttk.Style):
+        """ gives the row of column names of ALL tables a shaded background, so it stands apart from the rows of
+        values below it. The shade is the background color of the window, a step darker. """
+        windowing_system = self._root.tk.call('tk', 'windowingsystem')
+        if windowing_system == 'aqua':
+            return  # macOS draws the heading of a table itself, it is shaded there already
+
+        background = self._settings.background_color
+        if background == 'default':
+            background = self._root.cget('bg')
+        shade = self._shifted_color(background, 0.10)
+        shade_under_mouse = self._shifted_color(background, 0.16)
+
+        if self._os_type == OsType.WINDOWS:
+            # the Windows theme draws the heading itself and ignores a background color. The heading is put together
+            # here from the cell and the border of the 'default' theme, they take a color.
+            if 'Shaded.Treeheading.cell' not in style.element_names():
+                style.element_create('Shaded.Treeheading.cell', 'from', 'default')
+                style.element_create('Shaded.Treeheading.border', 'from', 'default')
+            style.layout('Treeview.Heading', [
+                ('Shaded.Treeheading.cell', {'sticky': 'nswe'}),
+                ('Shaded.Treeheading.border', {'sticky': 'nswe', 'children': [
+                    ('Treeheading.padding', {'sticky': 'nswe', 'children': [
+                        ('Treeheading.image', {'side': 'right', 'sticky': ''}),
+                        ('Treeheading.text', {'sticky': 'we'})]})]})])
+            # the groove is the thin line between two column names
+            style.configure('Treeview.Heading', relief='groove', borderwidth=1)
+
+        style.configure('Treeview.Heading', background=shade)
+        style.map('Treeview.Heading', background=[('active', shade_under_mouse)])
+
+    def _shifted_color(self, color: str, amount: float) -> str:
+        """ returns the color a step away from itself as '#rrggbb': darker for a light color, lighter for a dark one
+        :param color: any color tk knows, like '#f0f0f0' or 'SystemButtonFace'
+        :param amount: the size of the step, 0.1 is 10% of the way to black (or to white for a dark color)
+        """
+        red, green, blue = (channel / 65535 for channel in self._root.winfo_rgb(color))
+        is_light = (0.299 * red + 0.587 * green + 0.114 * blue) > 0.5
+        target = 0.0 if is_light else 1.0
+        channels = [round(255 * (channel + (target - channel) * amount)) for channel in (red, green, blue)]
+        return '#{:02x}{:02x}{:02x}'.format(*channels)
 
     def _border_color(self) -> str:
         """ returns the color of the line around a table in the current theme, used to give the message field the
         same border as the tables above and below it """
-        colors = {OsType.WINDOWS: '#828790', OsType.MAC: '#c5c5c5', OsType.LINUX: '#9e9a91'}
+        if self._os_type == OsType.MAC:
+            # the separator color of macOS follows the light and the dark theme. An older Tk does not know the name,
+            # a fixed gray that is readable in both themes is used then.
+            try:
+                self._root.winfo_rgb('systemSeparatorColor')
+                return 'systemSeparatorColor'
+            except tk.TclError:
+                return '#8e8e8e'
+        colors = {OsType.WINDOWS: '#828790', OsType.LINUX: '#9e9a91'}
         return colors.get(self._os_type, '#828790')
 
     def _flat_border(self, widget):
@@ -559,14 +663,309 @@ class MainWindow:
         """ sets the columns of the stack and locals tables to the widths in the settings """
         try:
             if hasattr(self, '_stack_table') and self._stack_table.winfo_exists():
-                self._stack_table.column('#0', width=self._px(self._settings.stack_index_width))
-                self._stack_table.column('value', width=self._px(self._settings.stack_value_width))
-                self._stack_table.column('type', width=self._px(self._settings.stack_type_width))
+                for column in self._stack_columns:
+                    self._stack_table.column(column.key, width=self._px(self._stack_column_width(column)))
             if hasattr(self, '_locals_table') and self._locals_table.winfo_exists():
                 self._locals_table.column('#0', width=self._px(self._settings.locals_width_key))
                 self._locals_table.column('value', width=self._px(self._settings.locals_width_value))
         except tk.TclError as ex:
             log(f"Error setting table column widths: {ex}")
+
+    # -------------------------------------  Stack columns ---------------------------------------
+
+    def _define_stack_columns(self) -> list:
+        """ returns the columns of the stack table, in the order they are shown.
+
+        To add a column, add one StackColumn to this list. The table, the entry in the 'Stack columns' menu, the
+        saved width and the saved visibility of the column all come from this list, nothing else needs to change.
+            - A column whose text can be worked out from the value (like Type, or a hex view of the value) only
+              needs its get_text method.
+            - A column that shows something that has to be remembered for each value (like Operation) reads it from
+              the meta dict of the value. Add the new key in _new_stack_meta() and fill it in _sync_stack_meta().
+
+        The stack value is always the column on the right, keep it the last one in the list and add a new column
+        above it.
+        """
+        return [
+            StackColumn('index', 'Index', 50, 'center', self._stack_text_index),
+            StackColumn('type', 'Type', 60, 'center', self._stack_text_type),
+            StackColumn('operation', 'Operation', 200, 'e', self._stack_text_operation),
+            StackColumn('value', 'Stack Values', 200, 'e', self._stack_text_value, always_visible=True),
+        ]
+
+    @staticmethod
+    def _stack_text_index(index, value, meta) -> str:
+        """ the text of the Index column: the stack level, 0 is X """
+        return f"{index}"
+
+    @staticmethod
+    def _stack_text_type(index, value, meta) -> str:
+        """ the text of the Type column: the python type of the value """
+        return '' if value is None else type(value).__name__
+
+    def _stack_text_value(self, index, value, meta) -> str:
+        """ the text of the Stack Values column: the value with the numeric display format of the settings """
+        # apply user formatting to numeric types
+        if isinstance(value, float):
+            if self._settings.use_engineering_notation_format is True:
+                return engnum.format_eng(value, self._settings.eng_format_num_length)
+            return f"{value:{self._settings.float_format_string}}"
+        if isinstance(value, int):
+            if self._settings.use_engineering_notation_format is True:
+                return engnum.format_eng(value, self._settings.eng_format_num_length)
+            return f"{value:{self._settings.integer_format_string}}"
+
+        # handle the case where the stack entry is None
+        if value is None:
+            return ''
+
+        text = str(value)
+        # truncate the displayed stack entry string if it is too long to fit in the table
+        desired_width = self._stack_column_width(self._stack_columns_by_key()['value'])
+        if len(text) > desired_width:
+            text = text[:desired_width] + '...'
+        return text
+
+    @staticmethod
+    def _stack_text_operation(index, value, meta) -> str:
+        """ the text of the Operation column: the operation that made the value, like '3 + 4' or 'sin(0.5)' """
+        return str(meta.get('operation', ''))
+
+    def _stack_columns_by_key(self) -> dict:
+        """ returns the stack columns as a dict of key: StackColumn """
+        return {column.key: column for column in self._stack_columns}
+
+    def _stack_column_width(self, column: StackColumn) -> int:
+        """ returns the width of a stack column in design pixels: from the settings, else the default of the column """
+        widths = getattr(self._settings, 'stack_column_widths', None)
+        try:
+            return int(widths.get(column.key, column.width))
+        except (AttributeError, TypeError, ValueError):
+            return column.width
+
+    def _visible_stack_columns(self) -> list:
+        """ returns the keys of the columns that are shown, in the order of the definitions. A column that can not be
+        hidden is always in the list, a key in the settings that is not a column (any more) is ignored. """
+        wanted = getattr(self._settings, 'stack_columns_visible', None)
+        if not isinstance(wanted, (list, tuple, set)):
+            wanted = CalculatorUiSettings().stack_columns_visible
+        return [column.key for column in self._stack_columns if column.always_visible or column.key in wanted]
+
+    def _apply_stack_columns(self):
+        """ shows the stack columns selected in the settings and ticks them in the 'Stack columns' menu """
+        visible = self._visible_stack_columns()
+        self._settings.stack_columns_visible = visible
+        if hasattr(self, '_stack_table') and self._stack_table.winfo_exists():
+            self._stack_table['displaycolumns'] = visible
+        for key, var in getattr(self, '_tk_var_stack_columns', dict()).items():
+            var.set(key in visible)
+
+    def _remember_stack_column_widths(self):
+        """ stores the width of every stack column as it is on screen to the settings, in design pixels, so a saved
+        state looks the same on a display with another scaling """
+        if hasattr(self, '_stack_table') and self._stack_table.winfo_exists():
+            self._settings.stack_column_widths = {
+                column.key: int(round(self._stack_table.column(column.key, 'width') / self._ui_scale))
+                for column in self._stack_columns}
+
+    def _menu_view_stack_columns(self):
+        """ bound to the entries of the 'Stack columns' menu: shows the ticked columns """
+        self._remember_stack_column_widths()  # keep the widths the user dragged
+        self._settings.stack_columns_visible = [key for key, var in self._tk_var_stack_columns.items() if var.get()]
+        self._apply_stack_columns()
+        self.re_draw_main_window_to_fit_all_elements()
+
+    # -------------------------------------  Stack meta ---------------------------------------
+    #
+    # The calculator holds the stack as a list of bare values and knows nothing else about a value. What the UI
+    # wants to show beside a value (so far: the operation that made it) is kept here, in self._stack_meta, one dict
+    # per stack value in the same order as the stack.
+    #
+    # The calculator does not tell the UI what it did to the stack, so _sync_stack_meta() works it out: it compares
+    # the stack before and after an action, and reads the operation from the message the calculator reports.
+
+    # how the calculator reports an operation in its message: (the start of the message, the text between the
+    # operation and its result, True when the result is a new value in X).
+    # The text between is None when the whole message is the operation and '' when the start of the message is.
+    # If the wording of a message in calc.py changes, change it here too, else that operation is no longer named.
+    _MESSAGE_OPERATIONS = (('Operation: ', ' = ', True),
+                           ('Function: ', ' = ', True),
+                           ('Negate: ', ' = ', True),
+                           ('Reciprocal: ', ' = ', True),
+                           ('Evaluated: ', ' to ', True),
+                           ('Assignment: ', None, False),
+                           ('Stack to list: ', '', True),
+                           ('Stack to array: ', '', True),
+                           ('Iterable to stack: ', '', False), )
+
+    _OPERATION_MAX_LENGTH = 1000  # characters, an operation on a large array would else fill the saved state
+
+    @staticmethod
+    def _new_stack_meta(operation: str = '') -> dict:
+        """ returns the dict of what the UI knows about one stack value. To remember something new about a value,
+        add a key here. """
+        return {'operation': operation}
+
+    def _tidy_operation(self, text) -> str:
+        """ returns the text of an operation on one line and not longer than _OPERATION_MAX_LENGTH """
+        text = ' '.join(str(text).split())
+        if len(text) > self._OPERATION_MAX_LENGTH:
+            text = text[:self._OPERATION_MAX_LENGTH] + ' ...'
+        return text
+
+    def _operation_from_message(self, message, stack: list):
+        """ returns (operation, replaces_x) for a message of the calculator: the operation it reports, like '3 + 4'
+        for 'Operation: 3 + 4 = 7', and True when the result of that operation is the new value in X.
+        Returns ('', False) for a message that reports no operation.
+
+        :param message: the message of the calculator
+        :param stack: the stack after the operation, the result that the message ends with is read from it
+        """
+        if not isinstance(message, str):
+            return '', False
+        for start, between, replaces_x in self._MESSAGE_OPERATIONS:
+            if not message.startswith(start):
+                continue
+            text = message[len(start):]
+            if between == '':
+                text = start.rstrip(': ').lower()  # like 'stack to list'
+            elif between is not None:
+                # cut the result off the end, it is the value that is in X now
+                result = f"{between}{stack[0]}" if len(stack) > 0 else None
+                if result is not None and text.endswith(result):
+                    text = text[:-len(result)]
+                else:
+                    text = text.rpartition(between)[0] or text
+            return self._tidy_operation(text), replaces_x
+        return '', False
+
+    @staticmethod
+    def _typed_operation(text: str) -> str:
+        """ returns the operation of a value that came from text typed into X: 'entry' for a plain number, else the
+        text itself, like the name of a variable that was recalled """
+        text = text.strip()
+        try:
+            float(text.replace(',', ''))
+            return 'entry'
+        except ValueError:
+            return text
+
+    def _sync_stack_meta(self):
+        """ brings self._stack_meta in step with the stack of the calculator. Call after every action that can
+        change the stack, _update_stack_display() does.
+
+        The rules, in this order, for each value that is on the stack now:
+            1. A value that is still at the same place, counted from the deep end of the stack, keeps its meta.
+            2. A value that only moved (swap, roll, put back after an error) keeps its meta.
+            3. A copy of a value, made when nothing left the stack (enter), gets a copy of its meta.
+            4. After an undo, a value that was on the stack before gets back the meta it had.
+            5. Text that is being typed into X has no operation yet. It keeps the meta of the text it was typed onto.
+            6. Any other value is new. Its operation is, the first one that is known: the operation the calculator
+               reports in its message, the name a UI action gave (paste, a variable name), the operation of the
+               text in X it came from (else that text, 'entry' for a plain number), the key that was pressed.
+        Last, when the calculator reports an operation whose result is the new X, X gets that operation even if
+        rule 1 or 2 matched: the result of '5 + 0' is the very same python object as the 5 that was there.
+
+        Values are compared with 'is', not with '==': two equal numbers on the stack are two different values.
+        """
+        new = self._c.return_stack_for_display()  # a copy of the list, it holds the same value objects
+        old, old_meta = self._stack_values, self._stack_meta
+
+        # a message is only about this action when it is not the message that was already there the last time
+        message = self._c.return_message()
+        fresh_message = message if message is not self._last_message_seen else None
+        self._last_message_seen = message
+        hint, self._stack_operation_hint = self._stack_operation_hint, None
+        last_input, self._last_input = self._last_input, None
+        restore, self._stack_meta_restore = self._stack_meta_restore, None
+
+        operation, replaces_x = self._operation_from_message(fresh_message, new)
+        unchanged = len(new) == len(old) and all(a is b for a, b in zip(new, old))
+        if unchanged and not (replaces_x and len(new) > 0):
+            return
+
+        # remember what is known about every value, an undo can bring back the ones that leave the stack now
+        for value, meta in zip(old, old_meta):
+            self._stack_meta_memory.pop(id(value), None)
+            self._stack_meta_memory.update({id(value): (value, meta)})
+        while len(self._stack_meta_memory) > 300:
+            self._stack_meta_memory.pop(next(iter(self._stack_meta_memory)))
+        is_undo = isinstance(fresh_message, str) and fresh_message.startswith('Undo')
+
+        # rule 1: the deep end of the stack that did not change
+        same = 0
+        while same < min(len(old), len(new)) and old[-1 - same] is new[-1 - same]:
+            same += 1
+        old_top, old_top_meta = old[:len(old) - same], old_meta[:len(old) - same]
+        new_top = new[:len(new) - same]
+
+        # the text that was in X, when it is gone from the stack the new values came from it
+        typed_text, typed_meta = None, None
+        if len(old) > 0 and isinstance(old[0], str):
+            typed_meta = old_meta[0]
+            if not any(value is old[0] for value in new):
+                typed_text = old[0]
+
+        # rule 6: the operation of a new value
+        new_operation = operation or hint
+        if not new_operation and typed_text is not None:
+            new_operation = typed_meta.get('operation') or self._typed_operation(typed_text)
+        if not new_operation and isinstance(last_input, str):
+            new_operation = last_input
+
+        claimed = set()  # the places in old_top that a new value has taken its meta from
+        top_meta = []
+        for value in new_top:
+            meta = None
+
+            # rule 2: the value only moved
+            for place, old_value in enumerate(old_top):
+                if place not in claimed and old_value is value:
+                    claimed.add(place)
+                    meta = old_top_meta[place]
+                    break
+
+            # rule 3: a copy of a value that is on the stack
+            if meta is None and len(old_top) == 0:
+                for old_value, known in zip(old, old_meta):
+                    if old_value is value:
+                        meta = dict(known)
+                        break
+
+            # rule 4: an undo brought the value back
+            if meta is None and is_undo:
+                remembered = self._stack_meta_memory.get(id(value))
+                if remembered is not None and remembered[0] is value:
+                    meta = dict(remembered[1])
+
+            # rule 5: text that is being typed
+            if meta is None and isinstance(value, str) and not operation and not hint:
+                if typed_text is not None and (value.startswith(typed_text) or typed_text.startswith(value)):
+                    meta = dict(typed_meta)  # the same text with a character more or less
+                elif isinstance(last_input, str) and value != last_input and not value.endswith(last_input):
+                    meta = self._new_stack_meta(last_input)  # a key that put a text in X, like the π key
+                else:
+                    meta = self._new_stack_meta()
+
+            # rule 6: a new value
+            if meta is None:
+                meta = self._new_stack_meta(self._tidy_operation(new_operation or ''))
+            top_meta.append(meta)
+
+        new_meta = top_meta + old_meta[len(old) - same:]
+
+        # a state was loaded: the values it put on the stack get the meta that was saved with them
+        if isinstance(restore, list) and len(restore) == len(new_top) and len(old_top) == 0:
+            for place, saved in enumerate(restore):
+                if isinstance(saved, dict):
+                    new_meta[place] = {**self._new_stack_meta(), **saved}
+
+        # the result of the reported operation is in X
+        if replaces_x and operation and len(new_meta) > 0:
+            new_meta[0] = self._new_stack_meta(operation)
+
+        self._stack_values = new
+        self._stack_meta = new_meta
 
     # -------------------------------------  Popup windows ---------------------------------------
 
@@ -796,6 +1195,7 @@ class MainWindow:
             return
         self._c.user_entry(value)
 
+        self._stack_operation_hint = str(key)  # the Operation column shows the name of the variable it came from
         self._update_stack_display()
         self._update_message_display(f"Inserted value at x: {key}={value}")
         log(f"Inserted value at x: {key}={value}")
@@ -868,7 +1268,7 @@ class MainWindow:
         if len(selected) == 0:
             return
         key = self._stack_table.item(selected)['text']
-        value = self._stack_table.item(selected)['values'][1]
+        value = self._stack_table.set(selected[0], 'value')  # the text of the value column, by the key of the column
         self.popup_edit_stack_value(key, value)
 
     def popup_edit_stack_value(self, key, value):
@@ -2190,6 +2590,7 @@ class MainWindow:
 
     def paste(self, value):
         """ handles pasting from the clipboard """
+        self._stack_operation_hint = 'paste'  # the Operation column shows where the pasted value came from
         try:
             if isinstance(value, str):
                 # check for and remove currency symbols
@@ -2402,21 +2803,19 @@ class MainWindow:
                 self._update_message_display(f"Error saving state to file: {ex}")
                 return
 
-        calc_state = CalculatorUiState()
-        calc_state.stack = self._c.return_stack_for_display()
-        calc_state.locals = self._c.return_locals()
-        calc_state.functions = self._c.return_user_functions()
-        calc_state.settings = copy(self._settings)
-
-
-
         # the widths are saved in design pixels, so a saved state looks the same on a display with another scaling
         def design_px(screen_pixels):
             return int(round(screen_pixels / self._ui_scale))
 
-        calc_state.settings.stack_value_width = design_px(self._stack_table.column('value', 'width'))
-        calc_state.settings.stack_index_width = design_px(self._stack_table.column('#0', 'width'))
-        calc_state.settings.stack_type_width = design_px(self._stack_table.column('type', 'width'))
+        self._sync_stack_meta()  # so the meta that is saved is the meta of the stack that is saved
+        self._remember_stack_column_widths()  # the width of every stack column, shown or hidden
+
+        calc_state = CalculatorUiState()
+        calc_state.stack = self._c.return_stack_for_display()
+        calc_state.stack_meta = [dict(meta) for meta in self._stack_meta]
+        calc_state.locals = self._c.return_locals()
+        calc_state.functions = self._c.return_user_functions()
+        calc_state.settings = copy(self._settings)
 
         if self._settings.show_locals_table == True: # only try to save locals table widths if the locals table is visible
 
@@ -2441,8 +2840,11 @@ class MainWindow:
             bytes = file.read()
             file.close()
             calc_state = pickle.loads(bytes)    # type: CalculatorUiState
+            self._sync_stack_meta()  # the loaded values are added to the stack as it is now
             self._load_calc_state(calc_state)
-            self._apply_fonts()  # the loaded state carries its own font settings
+            self._apply_fonts()  # the loaded state carries its own font settings and column widths
+            self._apply_stack_columns()  # and its own selection of stack columns
+            self.re_draw_main_window_to_fit_all_elements()
             self._update_locals_display()
             self._update_stack_display()
             self._update_message_display()
@@ -2457,6 +2859,11 @@ class MainWindow:
             for item in reversed(calc_state.stack):
                 self._c.user_entry(item)
             log(f"loaded stack: {calc_state.stack}")
+
+            # what the UI knew about each loaded value, the next _sync_stack_meta() gives it to the values that
+            # were just put on the stack. A state saved before the stack columns were added does not have it.
+            stack_meta = getattr(calc_state, 'stack_meta', None)
+            self._stack_meta_restore = list(stack_meta) if isinstance(stack_meta, list) else None
         if calc_state.settings is not None:
             # need to handle new items were added to the settings class
             incoming = calc_state.settings
@@ -2467,6 +2874,17 @@ class MainWindow:
             for key, value in vars(latest).items():
                 if key in incoming_keys:
                     setattr(latest, key, getattr(incoming, key))
+
+            # a state saved before the stack columns became selectable holds the width of each of the three columns
+            # of that time in a setting of its own, move them to where the widths are kept now
+            if 'stack_column_widths' not in incoming_keys:
+                widths = dict(latest.stack_column_widths)
+                for column_key, old_setting in (('index', 'stack_index_width'),
+                                                ('type', 'stack_type_width'),
+                                                ('value', 'stack_value_width')):
+                    if old_setting in incoming_keys:
+                        widths.update({column_key: getattr(incoming, old_setting)})
+                latest.stack_column_widths = widths
 
             self._settings = latest
 
@@ -2513,6 +2931,7 @@ class MainWindow:
 
     # define a method for button pushes that take a string as an argument and calls self._c.user_entry
     def button_press(self, input: str):
+        self._last_input = input  # names a value in the Operation column when nothing else does, like the π key
         self._c.user_entry(input)
         self._update_stack_display()
         self._update_message_display()
@@ -2550,62 +2969,29 @@ class MainWindow:
 
     # define a method for updating the stak table
     def _update_stack_display(self):
+        # bring what the UI knows about each stack value in step with the stack
+        self._sync_stack_meta()
+
         # clear the ui table
         self._stack_table.delete(*self._stack_table.get_children())
 
         for stack_index in range(self._settings.stack_rows).__reversed__():
 
-            stack_entry = self._c.return_stack_for_display(stack_index)
-            entry_type = type(stack_entry).__name__
-
-            # having number, hex and binary output simultaneously was fun but not very useful, keep for "developer" mode
-            # try:
-            #     hex_val = hex(int(stack_entry))
-            # except Exception as ex:
-            #     try:
-            #         hex_val = pack('d', float(stack_entry)).hex()
-            #     except Exception as ex:
-            #         hex_val = None
-            # try:
-            #     bin_val = bin(int(stack_entry))
-            # except Exception as ex:
-            #     try:
-            #         bin_val = bin(int(pack('d', float(stack_entry)).hex()))
-            #     except Exception as ex:
-            #         bin_val = None
-
-            # apply user formatting to numeric types
-            if isinstance(stack_entry, float):
-                if self._settings.use_engineering_notation_format is True:
-                    stack_entry_string = engnum.format_eng(stack_entry, self._settings.eng_format_num_length)
-                else:
-                    stack_entry_string = f"{stack_entry:{self._settings.float_format_string}}"
-            elif isinstance(stack_entry, int):
-                if self._settings.use_engineering_notation_format is True:
-                    stack_entry_string = engnum.format_eng(stack_entry, self._settings.eng_format_num_length)
-                else:
-                    stack_entry_string = f"{stack_entry:{self._settings.integer_format_string}}"
-
-            # handle the case where the stack entry is None
-            elif stack_entry is None:
-                stack_entry_string = ''
-                entry_type = ''
-                # hex_val = ''
-                # bin_val = ''
-
+            # a row above the top of the stack is empty: no value and nothing known about it
+            if stack_index < len(self._stack_values):
+                stack_entry = self._stack_values[stack_index]
+                meta = self._stack_meta[stack_index]
             else:
-                desired_width = self._settings.stack_value_width
-                stack_entry_string = str(stack_entry)
-                # truncate the displayed stack entry string if it is too long to fit in the table
-                if len(stack_entry_string) > desired_width:
-                    stack_entry_string = stack_entry_string[:desired_width] + '...'
-                    # print(f"truncated stack entry: '{stack_entry_string}' length: {len(stack_entry_string)}")
+                stack_entry = None
+                meta = dict()
 
-            # push the stack values to the table
+            # push the stack values to the table, each column makes the text of its own cell. The index is also the
+            # text of the row, the methods that act on the selected row read it from there
             self._stack_table.insert('',
                                      'end',
                                      text=f"{stack_index}",
-                                     values=(entry_type, stack_entry_string),
+                                     values=[column.get_text(stack_index, stack_entry, meta)
+                                             for column in self._stack_columns],
                                      )
 
     def _update_message_display(self, direct_message=None):
