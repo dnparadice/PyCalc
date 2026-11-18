@@ -689,7 +689,7 @@ class MainWindow:
         return [
             StackColumn('index', 'Index', 50, 'center', self._stack_text_index),
             StackColumn('type', 'Type', 60, 'center', self._stack_text_type),
-            StackColumn('operation', 'Operation', 200, 'e', self._stack_text_operation),
+            StackColumn('operation', 'Operation', 200, 'w', self._stack_text_operation),
             StackColumn('value', 'Stack Values', 200, 'e', self._stack_text_value, always_visible=True),
         ]
 
@@ -726,10 +726,49 @@ class MainWindow:
             text = text[:desired_width] + '...'
         return text
 
-    @staticmethod
-    def _stack_text_operation(index, value, meta) -> str:
-        """ the text of the Operation column: the operation that made the value, like '3 + 4' or 'sin(0.5)' """
-        return str(meta.get('operation', ''))
+    def _stack_text_operation(self, index, value, meta) -> str:
+        """ the text of the Operation column: the operation that made the value, like '3 + 4' or 'sin(0.5)'. The
+        operation is stored with every digit of its numbers, they are shortened here, for the display only. """
+        return self._shorten_floats(str(meta.get('operation', '')))
+
+    # a float that is written out in a text: digits, a dot and digits, with or without an exponent, or digits with
+    # an exponent. Not a part of a name (the 10 of log10) and not a part of a longer dotted text (1.2.3). An integer
+    # is not matched, and neither is the '0.' of an array like '[0. 1. 2.]'.
+    _FLOAT_IN_TEXT = re.compile(r'(?<![\w.])(?:\d+\.\d+(?:[eE][-+]?\d+)?|\d+[eE][-+]?\d+)(?![\w.])')
+
+    def _float_display_digits(self) -> int:
+        """ returns the number of digits of the float format of the settings, like 6 for '0.6f' """
+        found = re.search(r'\.(\d+)', str(self._settings.float_format_string))
+        return max(1, int(found.group(1))) if found is not None else 6
+
+    def _shorten_floats(self, text: str) -> str:
+        """ returns the text with every float in it shortened to the numeric display format of the settings.
+
+        A float that python writes out comes with every digit it has, like 0.30000000000000004. Once it is part of a
+        text it can not be formatted any more, so each float is read back from the text and written again, shorter.
+        Nothing is lost on the way: python writes a float as the shortest text that reads back as the same number.
+
+            - With engineering notation on, the float is written the way the stack value column writes it.
+            - Else it is written with as many significant digits as the float format of the settings has decimals,
+              in the 'e' form when it is very large or very small.
+            - A float that would not get shorter is left as it is, so 'sin(0.5)' does not become 'sin(0.500000)'.
+        """
+        use_engineering = self._settings.use_engineering_notation_format is True
+        digits = self._float_display_digits()
+
+        def shorten(match):
+            original = match.group()
+            try:
+                number = float(original)
+                if use_engineering:
+                    shorter = str(engnum.format_eng(number, self._settings.eng_format_num_length))
+                else:
+                    shorter = format(number, f'.{digits}g')
+            except Exception:
+                return original
+            return shorter if len(shorter) < len(original) else original
+
+        return self._FLOAT_IN_TEXT.sub(shorten, text)
 
     def _stack_columns_by_key(self) -> dict:
         """ returns the stack columns as a dict of key: StackColumn """
